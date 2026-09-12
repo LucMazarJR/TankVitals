@@ -305,10 +305,22 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Passo a passo**
 
-1. Crie um projeto novo em [wokwi.com](https://wokwi.com) → **ESP32 → Arduino**.
-   Confira que é Arduino mesmo: se o projeto for criado como ESP-IDF, o
-   `diagram.json` fica com `"builder": "esp-idf"` na placa e as bibliotecas do
-   `libraries.txt` não funcionam.
+1. Crie um projeto novo em **<https://wokwi.com/projects/new/arduino-esp32>**
+   (ESP32 → Arduino). **Não** use `wokwi.com/projects/new/esp32`: aquela URL
+   cria um projeto ESP-IDF, em C puro, com `main.c` em vez de `sketch.ino`.
+
+   Como saber que caiu no tipo errado — o build falha com:
+
+   ```
+   In file included from /sketch/main.c:24:
+   .../Printable.h:25:1: error: unknown type name 'class'
+   .../WiFiGeneric.h:31:10: fatal error: functional: No such file or directory
+   ```
+
+   O sinal é o `main.c` no caminho e o `unknown type name 'class'`: o
+   compilador está tratando o sketch como C. Num projeto ESP-IDF as
+   bibliotecas do `libraries.txt` também não funcionam. **Aconteceu em
+   12/09/2026** — o `wokwi-project.txt` registrava a URL errada.
    A placa usada é a `board-esp32-devkit-c-v4`, em que os pinos são nomeados
    pelo número do GPIO (`esp:4`, `esp:19`, `esp:34`...).
 2. Adicione as peças pelo botão **+** e faça as ligações desta tabela:
@@ -356,6 +368,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 - [x] As 7 peças (mais a placa) estão no circuito e ligadas conforme a tabela.
 - [x] O LED só acende quando o firmware manda, não fica aceso sozinho.
 - [x] `diagram.json` versionado e idêntico ao do Wokwi.
+- [ ] Projeto é do tipo **Arduino** (tem `sketch.ino`, não `main.c`).
 - [x] A simulação inicia sem aviso de fiação no console do Wokwi.
 
 **Peso:** 1,5 pts (dispositivo IoT).

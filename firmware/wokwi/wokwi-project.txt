@@ -1,3 +1,17 @@
-Downloaded from https://wokwi.com/projects/new/esp32
+Projeto Wokwi do tipo ESP32 -> Arduino (C++), criado em:
+https://wokwi.com/projects/new/arduino-esp32
 
 Simulate this project on https://wokwi.com
+
+ATENCAO: nao use https://wokwi.com/projects/new/esp32 -- aquela URL cria um
+projeto ESP-IDF, em C puro, com um main.c em vez de sketch.ino. O sketch deste
+repositorio e C++ de Arduino, e num projeto ESP-IDF a compilacao falha assim:
+
+  In file included from /sketch/main.c:24:
+  .../Printable.h:25:1: error: unknown type name 'class'
+  .../WiFiGeneric.h:31:10: fatal error: functional: No such file or directory
+
+O sinal e o "main.c" no caminho e o "unknown type name 'class'": o compilador
+esta tratando o arquivo como C. As bibliotecas do libraries.txt (OneWire,
+DallasTemperature, PubSubClient, ArduinoJson) tambem nao funcionam nesse tipo
+de projeto.
