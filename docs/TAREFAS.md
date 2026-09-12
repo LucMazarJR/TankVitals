@@ -1185,6 +1185,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 **Critério de aceite**
 
 - [ ] Roteiro escrito com quem fala cada parte.
+      *(escrito em [ROTEIRO-APRESENTACAO.md](ROTEIRO-APRESENTACAO.md); falta preencher os nomes)*
 - [ ] Ensaiado dentro do tempo.
 - [ ] Cada integrante sabe explicar a frente do colega no básico (o professor
       costuma perguntar para quem não implementou).

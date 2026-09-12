@@ -119,8 +119,11 @@ TankVitals/
 ├─ README.md                       <- problema, arquitetura e stack
 ├─ .env.example                    <- modelo de configuração (copie para .env)
 ├─ docs/
+│  ├─ COMO-FUNCIONA.md             <- explicação completa + como rodar do zero
+│  ├─ ROTEIRO-APRESENTACAO.md      <- roteiro de 10 min, bloco por bloco
 │  ├─ ARQUITETURA.md               <- contratos: MQTT, JSON, InfluxDB, API
 │  ├─ TAREFAS.md                   <- backlog com passo a passo e aceite
+│  ├─ O-QUE-FALTA.md               <- o que ainda depende de gente
 │  └─ PADROES-DESENVOLVIMENTO.md   <- branch, commit, PR e receitas de Git
 ├─ firmware/wokwi/                 <- circuito e sketch do ESP32 (FW-01..05)
 ├─ backend/
@@ -161,6 +164,10 @@ O sistema roda ponta a ponta: o simulador publica no MQTT, o ingestor valida e
 grava no InfluxDB, a API serve o dashboard e o gráfico atualiza ao vivo por
 WebSocket. **O que falta é validar com o ESP32 de verdade** (abrir o projeto no
 Wokwi) e preparar a entrega — prints, link do Wokwi e ensaio.
+
+**Para entender o sistema e rodar do zero:
+[docs/COMO-FUNCIONA.md](docs/COMO-FUNCIONA.md).**
+Para apresentar: [docs/ROTEIRO-APRESENTACAO.md](docs/ROTEIRO-APRESENTACAO.md).
 
 O passo a passo e o critério de aceite de cada tarefa estão em
 **[docs/TAREFAS.md](docs/TAREFAS.md)**; o que sobrou está reunido em
