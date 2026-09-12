@@ -16,6 +16,7 @@ import { Line } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
 import type { HistorySeries, MetricKey, MetricThreshold } from '../types'
 import { METRIC_META } from '../types'
+import { UI_ICON } from '../icons'
 
 ChartJS.register(
   CategoryScale,
@@ -34,6 +35,12 @@ const props = defineProps<{
   threshold?: MetricThreshold
   range: string
 }>()
+
+// Lidos do CSS para não duplicar hex entre folha de estilo e componente.
+const css = getComputedStyle(document.documentElement)
+const SERIE = css.getPropertyValue('--serie-1').trim() || '#2a78d6'
+const SERIE_WASH = 'rgba(42, 120, 214, 0.1)'
+const LIMITE = css.getPropertyValue('--nivel-atencao').trim() || '#d97706'
 
 const meta = computed(() => METRIC_META[props.metric])
 
@@ -54,8 +61,8 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       label: meta.value.label,
       data: points.map((point) => point.v),
       borderWidth: 2.5,
-      borderColor: '#157f78',
-      backgroundColor: 'rgba(21, 127, 120, 0.08)',
+      borderColor: SERIE,
+      backgroundColor: SERIE_WASH,
       pointRadius: points.length > 120 ? 0 : 2,
       pointHoverRadius: 4,
       tension: 0.25,
@@ -69,7 +76,7 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       data: points.map(() => safeMin.value as number),
       borderWidth: 1,
       borderDash: [6, 5],
-      borderColor: '#f59e0b',
+      borderColor: LIMITE,
       pointRadius: 0,
       fill: false,
     })
@@ -81,7 +88,7 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       data: points.map(() => safeMax.value as number),
       borderWidth: 1,
       borderDash: [6, 5],
-      borderColor: '#f59e0b',
+      borderColor: LIMITE,
       pointRadius: 0,
       fill: false,
     })
@@ -151,7 +158,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 <template>
   <div class="chart-wrap">
     <div v-if="!currentSeries || currentSeries.points.length === 0" class="chart-empty">
-      <div class="empty-icon">◌</div>
+      <div class="empty-icon"><component :is="UI_ICON.semDado" :size="24" aria-hidden="true" /></div>
       <strong>Sem dados no período</strong>
       <span>Assim que houver leituras, elas aparecerão neste gráfico.</span>
     </div>
