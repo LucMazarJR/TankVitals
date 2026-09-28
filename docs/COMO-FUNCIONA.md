@@ -48,7 +48,7 @@ publicada no MQTT a cada 5 segundos.
 | Temperatura | DS18B20 (GPIO 4, 1-Wire) | direto da biblioteca |
 | pH | potenciômetro (GPIO 34) | `analogRead` 0–4095 → escala 0–14 |
 | Nível | HC-SR04 (TRIG 5 / ECHO 18) | distância → % (cheio 5 cm, vazio 45 cm) |
-| Turbidez | LDR (GPIO 35) | `analogRead` **invertido** → 0–100 NTU |
+| Turbidez | LDR (GPIO 35) | `analogRead` 0–4095 → 0–100 NTU (mais luz = menos NTU) |
 
 Três decisões que valem saber explicar:
 

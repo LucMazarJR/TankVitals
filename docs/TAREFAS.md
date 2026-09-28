@@ -397,7 +397,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
    | --- | --- |
    | temperatura | `DallasTemperature::requestTemperatures()` + `getTempCByIndex(0)`; valor ≤ −100 significa sensor ausente → devolva `NAN` |
    | pH | `analogRead(34)` devolve 0–4095 → converta linearmente para 0–14 |
-   | turbidez | `analogRead(35)` 0–4095 → **invertido** para 0–100 NTU (mais luz = água mais limpa = menos NTU) |
+   | turbidez | `analogRead(35)` 0–4095 → 0–100 NTU, sem inverter: no módulo do Wokwi a tensão cai com mais luz (mais luz = água mais limpa = menos NTU) |
    | nível | pulso de 10 µs no TRIG, `pulseIn(ECHO, HIGH, 30000)`, distância = `duração × 0,0343 / 2`; converta distância em percentual usando cheio = 5 cm e vazio = 45 cm, limitando entre 0 e 100; timeout (`pulseIn` = 0) → `NAN` |
 
 4. No `loop()`, imprima as quatro leituras no serial a cada 5 s.
