@@ -148,9 +148,9 @@ No painel:
 4. **O painel de análise**: mín/média/máx das quatro de uma vez, quanto do
    período cada uma ficou fora da faixa, e a tendência de cada uma.
 
-> "Os limites das faixas não estão escritos no front. Eles vêm de um endpoint,
-> `/api/thresholds`, que lê do backend. Assim dispositivo, backend e painel
-> nunca discordam — não existe número de faixa repetido no projeto."
+> "Os limites das faixas vêm do backend, por um endpoint, o `/api/thresholds`.
+> O painel não decide faixa nenhuma: ele mostra o que o backend define, então
+> backend e painel nunca discordam."
 
 E sobre o tempo real:
 

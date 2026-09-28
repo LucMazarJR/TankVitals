@@ -291,8 +291,9 @@ sozinho e tenta reconectar.
 
 **"Onde ficam os limites das faixas?"**
 Em um lugar só, no `backend/app/config.py`, lido do `.env`. O firmware usa
-apenas a faixa "ok" para o LED, e o front busca tudo no `/api/thresholds`. Não
-existe número de faixa repetido no projeto.
+apenas a faixa "ok" para o LED, e o front busca tudo no `/api/thresholds` —
+ele só guarda uma cópia de reserva (`DEFAULT_THRESHOLDS`) para o caso de a API
+não mandar alguma grandeza.
 
 **"E se o banco cair no meio?"**
 O ingestor registra `WARNING` e continua; quando o banco volta, ele volta a
