@@ -110,12 +110,25 @@ def _valid_measurement(field: str, value) -> float | None:
     return number
 
 
+# Tolerância entre o relógio do dispositivo e o do servidor. O ESP32 do Wokwi
+# sincroniza o NTP uma vez e depois o relógio anda no ritmo da simulação, que é
+# de 3 a 7 vezes mais lenta: o ts fica cada vez mais no passado, e o dashboard
+# mostrava "última leitura há 475 s" com dado acabando de chegar.
+MAX_CLOCK_SKEW_S = 60
+
+# Avisa uma vez por episódio de desvio; com o Wokwi seria um WARNING a cada 5 s.
+_desvio_avisado = False
+
+
 def _parse_timestamp(ts) -> datetime:
     """Converte timestamp Unix em datetime UTC.
 
     Conforme a arquitetura:
-    ts ausente ou <= 1700000000 usa horário do servidor.
+    ts ausente, <= 1700000000 ou a mais de MAX_CLOCK_SKEW_S do relógio do
+    servidor usa o horário do servidor.
     """
+
+    agora = datetime.now(timezone.utc)
 
     try:
         timestamp = int(ts)
@@ -123,16 +136,30 @@ def _parse_timestamp(ts) -> datetime:
         timestamp = 0
 
     if timestamp <= 1700000000:
-        return datetime.now(timezone.utc)
+        return agora
 
     try:
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        device_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
     except (ValueError, OSError, OverflowError):
         logger.warning(
             "Timestamp inválido (%r). Usando horário do servidor.",
             ts,
         )
-        return datetime.now(timezone.utc)
+        return agora
+
+    global _desvio_avisado
+    desvio = (device_time - agora).total_seconds()
+    if abs(desvio) > MAX_CLOCK_SKEW_S:
+        if not _desvio_avisado:
+            logger.warning(
+                "Relógio do dispositivo %+.0f s fora do servidor. Usando horário do servidor.",
+                desvio,
+            )
+            _desvio_avisado = True
+        return agora
+
+    _desvio_avisado = False
+    return device_time
 
 
 def parse_reading(topic: str, payload: bytes) -> SensorReading | None:
@@ -144,7 +171,7 @@ def parse_reading(topic: str, payload: bytes) -> SensorReading | None:
     2. sem device_id ou tank_id -> None
     3. grandeza fora da faixa válida -> remove apenas o campo
     4. nenhuma grandeza sobrou -> None
-    5. ts ausente ou <= 1700000000 -> horário do servidor
+    5. ts ausente, <= 1700000000 ou a mais de 60 s do servidor -> horário do servidor
     6. tank_id divergente do tópico -> usa o tópico + WARNING
     """
 
