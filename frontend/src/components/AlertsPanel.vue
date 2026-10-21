@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { AlertLevel, HistorySeries, MetricKey, MetricThreshold } from '../types'
 import { METRIC_META } from '../types'
 import { classifyMetric, LEVEL_TEXT } from '../alerts'
+import { LEVEL_ICON, METRIC_ICON } from '../icons'
 
 const props = defineProps<{
   history: HistorySeries | null
@@ -52,7 +53,7 @@ function formatDate(time: string): string {
 <template>
   <section class="alerts-panel">
     <div v-if="alerts.length === 0" class="alerts-empty">
-      <span class="check-icon">✓</span>
+      <span class="check-icon"><component :is="LEVEL_ICON.ok" :size="20" aria-hidden="true" /></span>
       <div>
         <strong>Nenhuma ocorrência</strong>
         <span>Todos os dados estão dentro da faixa segura neste período.</span>
@@ -65,9 +66,14 @@ function formatDate(time: string): string {
         :key="`${alert.time}-${alert.metric}-${index}`"
         class="alert-row"
       >
-        <div :class="['alert-symbol', `badge-${alert.level}`]">!</div>
+        <div :class="['alert-symbol', `badge-${alert.level}`]">
+          <component :is="LEVEL_ICON[alert.level]" :size="15" aria-hidden="true" />
+        </div>
         <div class="alert-info">
-          <strong>{{ METRIC_META[alert.metric].label }}</strong>
+          <strong>
+            <component :is="METRIC_ICON[alert.metric]" :size="14" aria-hidden="true" />
+            {{ METRIC_META[alert.metric].label }}
+          </strong>
           <span>{{ formatDate(alert.time) }}</span>
         </div>
         <div class="alert-value">

@@ -109,7 +109,9 @@ float lerPh() {
 }
 
 float lerTurbidez() {
-  float ntu = ((4095.0f - analogRead(PIN_TURBIDITY)) * 100.0f) / 4095.0f;
+  // O modulo do Wokwi baixa a tensao quando a luz aumenta, entao a leitura ja
+  // vem no sentido da turbidez: mais luz = agua mais limpa = menos NTU.
+  float ntu = (analogRead(PIN_TURBIDITY) * 100.0f) / 4095.0f;
   return ntu < 0.0f ? 0.0f : ntu;
 }
 

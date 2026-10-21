@@ -39,6 +39,27 @@ Não tenho toolchain Arduino nem navegador, então escrevi o
 (os 12 campos da §2.2 e os 3 tópicos da §2.1 batem), mas **ele nunca foi
 compilado**.
 
+### Antes de tudo: o projeto tem que ser Arduino, não ESP-IDF
+
+Na primeira tentativa (12/09/2026) o build falhou com `unknown type name
+'class'` e `fatal error: functional: No such file or directory`, porque o
+projeto havia sido criado em `wokwi.com/projects/new/esp32` — que é o template
+**ESP-IDF, em C puro**, com `main.c` no lugar de `sketch.ino`. O sketch deste
+repositório é C++ de Arduino.
+
+Recriar no tipo certo, que é mais rápido do que tentar converter:
+
+1. Abrir **<https://wokwi.com/projects/new/arduino-esp32>**.
+2. Na aba `diagram.json`, colar o conteúdo de
+   [firmware/wokwi/diagram.json](../firmware/wokwi/diagram.json) (o circuito da
+   FW-01 já está pronto e é portável).
+3. Na aba `sketch.ino`, colar
+   [firmware/wokwi/sketch.ino](../firmware/wokwi/sketch.ino).
+4. Adicionar as 4 bibliotecas do `libraries.txt` pelo Library Manager.
+
+Confirme que a aba do código se chama **`sketch.ino`**. Se aparecer `main.c`,
+é o tipo errado de novo.
+
 ### Passo a passo
 
 1. Abra o projeto no Wokwi e cole `firmware/wokwi/sketch.ino`.

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Component } from 'vue'
 import type { MetricThreshold, MetricValue } from '../types'
 import { LEVEL_TEXT, safeRangeLabel } from '../alerts'
+import { LEVEL_ICON, UI_ICON } from '../icons'
 
 const props = defineProps<{
-  icon: string
+  icon: Component
   label: string
   metric: MetricValue | undefined
   threshold?: MetricThreshold
@@ -26,10 +28,15 @@ const safeRange = computed(() => safeRangeLabel(props.threshold, props.metric?.u
 <template>
   <article :class="['metric-card', `level-${metric?.level ?? 'ok'}`]">
     <div class="metric-head">
-      <div class="metric-icon">{{ icon }}</div>
+      <div class="metric-icon"><component :is="icon" :size="18" aria-hidden="true" /></div>
       <span class="metric-label">{{ label }}</span>
       <span v-if="metric" :class="['level-badge', `badge-${metric.level}`]">
+        <component :is="LEVEL_ICON[metric.level]" :size="13" aria-hidden="true" />
         {{ LEVEL_TEXT[metric.level] }}
+      </span>
+      <span v-else class="level-badge badge-vazio">
+        <component :is="UI_ICON.semDado" :size="13" aria-hidden="true" />
+        Sem dado
       </span>
     </div>
 

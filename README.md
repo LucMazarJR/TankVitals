@@ -119,8 +119,13 @@ TankVitals/
 ├─ README.md                       <- problema, arquitetura e stack
 ├─ .env.example                    <- modelo de configuração (copie para .env)
 ├─ docs/
+│  ├─ COMO-FUNCIONA.md             <- explicação completa + como rodar do zero
+│  ├─ ROTEIRO-APRESENTACAO.md      <- roteiro de 10 min, bloco por bloco
+│  ├─ GUIA-DEMONSTRACAO.md         <- checklist da apresentação, item por item
+│  ├─ PREPARACAO-PERGUNTAS.md      <- a arquitetura explicada, peça por peça
 │  ├─ ARQUITETURA.md               <- contratos: MQTT, JSON, InfluxDB, API
 │  ├─ TAREFAS.md                   <- backlog com passo a passo e aceite
+│  ├─ O-QUE-FALTA.md               <- o que ainda depende de gente
 │  └─ PADROES-DESENVOLVIMENTO.md   <- branch, commit, PR e receitas de Git
 ├─ firmware/wokwi/                 <- circuito e sketch do ESP32 (FW-01..05)
 ├─ backend/
@@ -151,16 +156,21 @@ TankVitals/
 | Infraestrutura no ar (Mosquitto + InfluxDB) | ✅ INFRA-01, 02 e 04 validados |
 | Backend e frontend em container (perfil `app`) | ✅ imagens buildando |
 | Circuito no Wokwi e leitura dos 4 sensores | ✅ FW-01 e FW-02 |
-| Firmware: Wi-Fi, MQTT e publicação | ✅ FW-03..05 escritos, falta rodar no Wokwi |
+| Firmware: Wi-Fi, MQTT e publicação | ✅ FW-03..05 validados no Wokwi (0 % de perda, Last Will, `/cmd`) |
 | Backend Python | ✅ BE-01..09, 106 testes verdes |
 | Frontend Vue 3 | ✅ FE-01..08, build limpo |
-| Cadeia completa validada (MQTT → Influx → API → dashboard) | ✅ com o simulador; falta com o Wokwi |
-| Apresentação e evidências | ⬜ ENT-01..04 |
+| Cadeia completa validada (MQTT → Influx → API → dashboard) | ✅ com o ESP32 no Wokwi e com o simulador |
+| Apresentação e evidências | 🟡 roteiro e guias prontos; faltam link do Wokwi, prints e ensaio |
 
-O sistema roda ponta a ponta: o simulador publica no MQTT, o ingestor valida e
-grava no InfluxDB, a API serve o dashboard e o gráfico atualiza ao vivo por
-WebSocket. **O que falta é validar com o ESP32 de verdade** (abrir o projeto no
-Wokwi) e preparar a entrega — prints, link do Wokwi e ensaio.
+O sistema roda ponta a ponta com o dispositivo real: o ESP32 no Wokwi publica no
+MQTT, o ingestor valida e grava no InfluxDB, a API serve o dashboard e o gráfico
+atualiza ao vivo por WebSocket. **Todos os requisitos do 1º bimestre estão
+atendidos.** O que falta é preparar a entrega: link público do Wokwi, prints e
+ensaio.
+
+**Para entender o sistema e rodar do zero:
+[docs/COMO-FUNCIONA.md](docs/COMO-FUNCIONA.md).**
+Para apresentar: [docs/ROTEIRO-APRESENTACAO.md](docs/ROTEIRO-APRESENTACAO.md).
 
 O passo a passo e o critério de aceite de cada tarefa estão em
 **[docs/TAREFAS.md](docs/TAREFAS.md)**; o que sobrou está reunido em

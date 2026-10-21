@@ -283,8 +283,8 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Critério de aceite**
 
-- [ ] Telemetria chegando no broker local a cada ~5 s.
-- [ ] `status` = `online` ao iniciar e `offline` ao parar a simulação.
+- [x] Telemetria chegando no broker local a cada ~5 s.
+- [x] `status` = `online` ao iniciar e `offline` ao parar a simulação.
 - [ ] Saída real colada na documentação.
 
 **Ref.:** ARQUITETURA §10. **Peso:** parte de 2,0 pts.
@@ -305,10 +305,22 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Passo a passo**
 
-1. Crie um projeto novo em [wokwi.com](https://wokwi.com) → **ESP32 → Arduino**.
-   Confira que é Arduino mesmo: se o projeto for criado como ESP-IDF, o
-   `diagram.json` fica com `"builder": "esp-idf"` na placa e as bibliotecas do
-   `libraries.txt` não funcionam.
+1. Crie um projeto novo em **<https://wokwi.com/projects/new/arduino-esp32>**
+   (ESP32 → Arduino). **Não** use `wokwi.com/projects/new/esp32`: aquela URL
+   cria um projeto ESP-IDF, em C puro, com `main.c` em vez de `sketch.ino`.
+
+   Como saber que caiu no tipo errado — o build falha com:
+
+   ```
+   In file included from /sketch/main.c:24:
+   .../Printable.h:25:1: error: unknown type name 'class'
+   .../WiFiGeneric.h:31:10: fatal error: functional: No such file or directory
+   ```
+
+   O sinal é o `main.c` no caminho e o `unknown type name 'class'`: o
+   compilador está tratando o sketch como C. Num projeto ESP-IDF as
+   bibliotecas do `libraries.txt` também não funcionam. **Aconteceu em
+   12/09/2026** — o `wokwi-project.txt` registrava a URL errada.
    A placa usada é a `board-esp32-devkit-c-v4`, em que os pinos são nomeados
    pelo número do GPIO (`esp:4`, `esp:19`, `esp:34`...).
 2. Adicione as peças pelo botão **+** e faça as ligações desta tabela:
@@ -356,6 +368,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 - [x] As 7 peças (mais a placa) estão no circuito e ligadas conforme a tabela.
 - [x] O LED só acende quando o firmware manda, não fica aceso sozinho.
 - [x] `diagram.json` versionado e idêntico ao do Wokwi.
+- [x] Projeto é do tipo **Arduino** (tem `sketch.ino`, não `main.c`).
 - [x] A simulação inicia sem aviso de fiação no console do Wokwi.
 
 **Peso:** 1,5 pts (dispositivo IoT).
@@ -384,7 +397,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
    | --- | --- |
    | temperatura | `DallasTemperature::requestTemperatures()` + `getTempCByIndex(0)`; valor ≤ −100 significa sensor ausente → devolva `NAN` |
    | pH | `analogRead(34)` devolve 0–4095 → converta linearmente para 0–14 |
-   | turbidez | `analogRead(35)` 0–4095 → **invertido** para 0–100 NTU (mais luz = água mais limpa = menos NTU) |
+   | turbidez | `analogRead(35)` 0–4095 → 0–100 NTU, sem inverter: no módulo do Wokwi a tensão cai com mais luz (mais luz = água mais limpa = menos NTU) |
    | nível | pulso de 10 µs no TRIG, `pulseIn(ECHO, HIGH, 30000)`, distância = `duração × 0,0343 / 2`; converta distância em percentual usando cheio = 5 cm e vazio = 45 cm, limitando entre 0 e 100; timeout (`pulseIn` = 0) → `NAN` |
 
 4. No `loop()`, imprima as quatro leituras no serial a cada 5 s.
@@ -435,9 +448,9 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Critério de aceite**
 
-- [ ] Serial mostra o IP obtido e "conectado" no MQTT em menos de 15 s.
-- [ ] `mosquitto_sub` no broker recebe `online` no tópico de status.
-- [ ] Parar a simulação faz o broker publicar `offline` (Last Will).
+- [x] Serial mostra o IP obtido e "conectado" no MQTT em menos de 15 s.
+- [x] `mosquitto_sub` no broker recebe `online` no tópico de status.
+- [x] Parar a simulação faz o broker publicar `offline` (Last Will).
 - [ ] Reiniciar o broker não deixa o ESP32 travado — ele reconecta sozinho.
 
 **Ref.:** ARQUITETURA §2.1, §7. **Peso:** parte de 2,0 pts (MQTT).
@@ -471,11 +484,11 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Critério de aceite**
 
-- [ ] JSON recebido no `mosquitto_sub` bate campo a campo com a ARQUITETURA §2.2.
-- [ ] Nenhum campo com `NaN`, `null` ou `inf`.
-- [ ] `seq` incrementa de 1 em 1 sem pular.
-- [ ] Intervalo de publicação estável em ~5 s, sem `delay()` no loop.
-- [ ] O JSON passa em um validador (ex.: `jq .` no terminal).
+- [x] JSON recebido no `mosquitto_sub` bate campo a campo com a ARQUITETURA §2.2.
+- [x] Nenhum campo com `NaN`, `null` ou `inf`.
+- [x] `seq` incrementa de 1 em 1 sem pular.
+- [x] Intervalo de publicação estável em ~5 s, sem `delay()` no loop.
+- [x] O JSON passa em um validador (ex.: `jq .` no terminal).
 
 **Ref.:** ARQUITETURA §2.2, §3. **Peso:** parte de 1,5 + 2,0 pts.
 
@@ -504,8 +517,8 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 **Critério de aceite**
 
 - [ ] Girar o potenciômetro para pH 3 acende o LED; voltar para 7 apaga.
-- [ ] Comando de intervalo funciona e é rejeitado fora da faixa 1–300.
-- [ ] JSON malformado no tópico `/cmd` não derruba o firmware.
+- [x] Comando de intervalo funciona e é rejeitado fora da faixa 1–300.
+- [x] JSON malformado no tópico `/cmd` não derruba o firmware.
 
 **Ref.:** ARQUITETURA §2.3, §5. **Peso:** parte de 1,5 pts + base do 2º bimestre.
 
@@ -682,8 +695,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 
 **Critério de aceite**
 
-- [ ] Com o Wokwi rodando, o log mostra uma leitura gravada a cada ~5 s.
-      *(conferido com `fake_device.py --interval 5`; falta repetir com o Wokwi)*
+- [x] Com o Wokwi rodando, o log mostra uma leitura gravada a cada ~5 s.
 - [x] Payload lixo publicado à mão gera `WARNING` e **não** derruba o serviço.
 - [x] Derrubar e subir o Mosquitto: o ingestor reconecta sozinho e volta a gravar.
 - [x] Mensagem `offline` no tópico de status é refletida no estado em memória.
@@ -1173,6 +1185,7 @@ ESP32 (Wokwi) --publish--> test.mosquitto.org:1883 --bridge--> Mosquitto local -
 **Critério de aceite**
 
 - [ ] Roteiro escrito com quem fala cada parte.
+      *(escrito em [ROTEIRO-APRESENTACAO.md](ROTEIRO-APRESENTACAO.md); falta preencher os nomes)*
 - [ ] Ensaiado dentro do tempo.
 - [ ] Cada integrante sabe explicar a frente do colega no básico (o professor
       costuma perguntar para quem não implementou).

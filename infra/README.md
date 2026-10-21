@@ -129,8 +129,32 @@ tankvitals-unifacef-g3/tanque-01/telemetry {"device_id":"esp32-tank-01","tank_id
 Bucket conferido: `tankvitals`, org `unifacef`, `retentionRules[0].everySeconds
 = 2592000` (30 dias).
 
-> Falta ainda a parte que depende do dispositivo: telemetria a cada ~5 s vinda
-> do Wokwi e o `offline` do Last Will ao parar a simulação (precisa da FW-03).
+### Com o ESP32 real (12/09/2026)
+
+Payload publicado pelo dispositivo no Wokwi, recebido no broker local pela
+bridge — 12 de 12 campos da §2.2, sem `NaN`/`null`/`inf`:
+
+```
+tankvitals-unifacef-g3/tanque-01/telemetry {"device_id":"esp32-tank-01","tank_id":"tanque-01","fw":"1.0.0","seq":41,"uptime_s":212,"rssi":-84,"ts":1789219223,"temperature_c":27.19,"ph":7.05,"level_pct":84.8,"distance_cm":11.1,"turbidity_ntu":29.6}
+```
+
+Gravação pelo ingestor, com a regra 3 da §3 agindo — `distance_cm` de 403,5 cm
+passa do limite válido (400) e **só aquele campo** foi descartado:
+
+```
+Leitura gravada: tank_id=tanque-01 temp=48.88 ph=0.0 nivel=0.0 distancia=None turbidez=88.7 alerta=critico
+```
+
+Perda de mensagem medida pelo `seq` em 60 s: **0 %** (seq 30→34, sem lacuna),
+intervalo de 5,0 s por publicação.
+
+Last Will confirmado: ao parar a simulação, o status retido virou `offline`
+sozinho, publicado pelo broker.
+
+> **Atenção ao relógio.** A simulação do Wokwi roda de 3 a 7 vezes mais devagar
+> que o tempo real: 5 s de dispositivo levam de 15 a 35 s de relógio. O
+> dashboard parece lento por isso, não por causa do backend (o push do
+> WebSocket leva 78 ms).
 
 ---
 

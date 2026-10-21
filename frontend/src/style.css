@@ -1,4 +1,9 @@
 :root {
+  /* Cor de série: identidade do dado plotado, NUNCA um token de status.
+     Usar o teal do "ok" na linha do gráfico fazia a série parecer dizer
+     "está tudo bem" mesmo desenhando uma leitura crítica. */
+  --serie-1: #2a78d6;
+
   --nivel-ok: #157f78;
   --nivel-atencao: #d97706;
   --nivel-critico: #dc2626;
@@ -896,5 +901,291 @@ h1 {
 
   .overall-status {
     justify-content: center;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Painel de análise e sparklines
+   --------------------------------------------------------------------------- */
+
+.analise {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.analise-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.analise-resumo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--background);
+  border-radius: 10px;
+}
+
+.analise-resumo-item > span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Figuras proporcionais: valor solto e grande não usa tabular-nums. */
+.analise-resumo-item > strong {
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.analise-resumo-item > small {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.analise-tabela {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.analise-tabela th,
+.analise-tabela td {
+  padding: 11px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.analise-tabela thead th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.analise-tabela tbody tr:last-child th,
+.analise-tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Colunas de número alinham verticalmente: aqui tabular-nums é o certo. */
+.analise-tabela .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.analise-tabela .num.destaque {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.analise-grandeza {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.analise-grandeza svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.analise-grandeza small {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.analise-agora {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.analise-agora strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.analise-agora small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* Ink de status: a cor acompanha o ícone, nunca o texto do valor. */
+.ink-ok      { color: var(--nivel-ok); }
+.ink-atencao { color: var(--nivel-atencao); }
+.ink-critico { color: var(--nivel-critico); }
+
+/* Medidor: trilha em passo claro, preenchimento carrega a severidade. */
+.medidor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 110px;
+}
+
+.medidor-trilha {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.medidor-preenchido {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.medidor-preenchido.nivel-ok      { background: var(--nivel-ok); }
+.medidor-preenchido.nivel-atencao { background: var(--nivel-atencao); }
+.medidor-preenchido.nivel-critico { background: var(--nivel-critico); }
+
+.medidor-valor {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 30px;
+  text-align: right;
+}
+
+.analise-spark {
+  width: 200px;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 40px;
+  overflow: visible;
+}
+
+/* Banda da faixa segura: recessiva, um passo fora da superfície. */
+.sparkline-banda {
+  fill: var(--nivel-ok);
+  opacity: 0.07;
+}
+
+.sparkline-area {
+  fill: var(--serie-1);
+  opacity: 0.1;
+}
+
+.sparkline-linha {
+  fill: none;
+  stroke: var(--serie-1);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Anel na cor da superfície: mantém a ponta legível sobre a linha. */
+.sparkline-ponta {
+  fill: var(--serie-1);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.sparkline-vazio {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.analise-vazio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px;
+  color: var(--muted);
+  background: var(--background);
+  border-radius: 10px;
+}
+
+.analise-vazio svg {
+  color: var(--nivel-ok);
+}
+
+.analise-nota {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-vazio {
+  background: var(--background);
+  color: var(--muted);
+}
+
+/* Ícones dentro de badges e rótulos alinham com o texto. */
+.level-badge,
+.table-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.alert-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-info strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alert-info strong svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  /* Tabela larga rola no próprio contêiner; a página nunca rola na horizontal. */
+  .analise-tabela {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .analise-spark,
+  .sparkline {
+    width: 140px;
   }
 }

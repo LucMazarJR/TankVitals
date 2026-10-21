@@ -97,35 +97,30 @@ export const METRIC_META: Record<MetricKey, {
   shortLabel: string
   unit: string
   decimals: number
-  icon: string
 }> = {
   temperature_c: {
     label: 'Temperatura da água',
     shortLabel: 'Temperatura',
     unit: '°C',
     decimals: 1,
-    icon: '🌡️',
   },
   ph: {
     label: 'pH',
     shortLabel: 'pH',
     unit: 'pH',
     decimals: 2,
-    icon: '🧪',
   },
   level_pct: {
     label: 'Nível da água',
     shortLabel: 'Nível',
     unit: '%',
     decimals: 1,
-    icon: '💧',
   },
   turbidity_ntu: {
     label: 'Turbidez',
     shortLabel: 'Turbidez',
     unit: 'NTU',
     decimals: 1,
-    icon: '🔬',
   },
 }
 

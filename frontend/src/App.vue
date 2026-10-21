@@ -7,8 +7,10 @@ import RangeSelector from './components/RangeSelector.vue'
 import HistoryChart from './components/HistoryChart.vue'
 import HistoryTable from './components/HistoryTable.vue'
 import AlertsPanel from './components/AlertsPanel.vue'
+import AnalysisPanel from './components/AnalysisPanel.vue'
 import { useLiveReadings } from './composables/useLiveReadings'
 import { useHistory } from './composables/useHistory'
+import { METRIC_ICON, LEVEL_ICON, UI_ICON } from './icons'
 import {
   DEFAULT_THRESHOLDS,
   METRIC_META,
@@ -24,6 +26,9 @@ const thresholds = ref<Thresholds>(DEFAULT_THRESHOLDS)
 const range = ref<HistoryRange>('6h')
 const selectedMetric = ref<MetricKey>('temperature_c')
 
+const LEVEL_ICON_CRITICO = LEVEL_ICON.critico
+const LEVEL_ICON_ATENCAO = LEVEL_ICON.atencao
+
 const bootstrapLoading = ref(true)
 const bootstrapError = ref<string | null>(null)
 
@@ -33,7 +38,8 @@ const {
   stats,
   loading: historyLoading,
   error: historyError,
-} = useHistory(tankId, range, selectedMetric)
+  atualizadoEm,
+} = useHistory(tankId, range)
 
 const metricKeys: MetricKey[] = [
   'temperature_c',
@@ -105,6 +111,15 @@ function normalizeThresholds(input: Thresholds): Thresholds {
   return merged
 }
 
+const atualizadoLabel = computed(() => {
+  if (!atualizadoEm.value) return ''
+  return atualizadoEm.value.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+})
+
 function selectTank(id: string) {
   tankId.value = id
 }
@@ -128,7 +143,7 @@ onMounted(() => {
 
     <main class="dashboard">
       <div v-if="bootstrapError" class="global-error">
-        <span>⚠</span>
+        <component :is="LEVEL_ICON_CRITICO" :size="20" aria-hidden="true" />
         <div>
           <strong>Backend não disponível</strong>
           <small>{{ bootstrapError }} — tentando manter a interface disponível.</small>
@@ -152,6 +167,8 @@ onMounted(() => {
             </select>
           </label>
 
+          <RangeSelector v-model="range" />
+
           <div :class="['overall-status', overallClass]">
             <span class="overall-dot" />
             {{ overallLabel }}
@@ -163,7 +180,7 @@ onMounted(() => {
         <MetricCard
           v-for="key in metricKeys"
           :key="key"
-          :icon="METRIC_META[key].icon"
+          :icon="METRIC_ICON[key]"
           :label="METRIC_META[key].label"
           :metric="reading?.metrics[key]"
           :threshold="thresholds[key]"
@@ -171,7 +188,7 @@ onMounted(() => {
       </section>
 
       <div v-if="liveError" class="inline-warning">
-        <span>⚠</span>
+        <component :is="LEVEL_ICON_ATENCAO" :size="16" aria-hidden="true" />
         {{ liveError }}
         <span v-if="connection === 'polling'"> O dashboard está usando consulta automática a cada 5 segundos.</span>
       </div>
@@ -183,6 +200,8 @@ onMounted(() => {
             <h3>Evolução das leituras</h3>
           </div>
 
+          <!-- Só a grandeza fica aqui: ela escopa apenas este gráfico.
+               O período subiu para a barra de cima, porque filtra vários painéis. -->
           <div class="chart-controls">
             <label class="select-field metric-select">
               <span>Grandeza</span>
@@ -192,8 +211,6 @@ onMounted(() => {
                 </option>
               </select>
             </label>
-
-            <RangeSelector v-model="range" />
           </div>
         </div>
 
@@ -203,7 +220,7 @@ onMounted(() => {
         </div>
 
         <div v-else-if="historyError" class="error-state">
-          <div class="empty-icon">⚠</div>
+          <component :is="LEVEL_ICON_CRITICO" :size="22" aria-hidden="true" />
           <strong>Não foi possível carregar o histórico</strong>
           <span>{{ historyError }}</span>
         </div>
@@ -236,6 +253,26 @@ onMounted(() => {
         </div>
       </section>
 
+      <section class="panel">
+        <div class="panel-header compact">
+          <div>
+            <span class="eyebrow">ANÁLISE</span>
+            <h3>Comportamento no período</h3>
+          </div>
+          <span v-if="atualizadoLabel" class="small-note live-note">
+            <component :is="UI_ICON.atualizando" :size="13" aria-hidden="true" />
+            atualizado às {{ atualizadoLabel }}
+          </span>
+        </div>
+        <AnalysisPanel
+          :history="history"
+          :stats="stats"
+          :thresholds="thresholds"
+          :reading="reading"
+          :range="range"
+        />
+      </section>
+
       <section class="lower-grid">
         <div class="panel">
           <div class="panel-header compact">
@@ -264,7 +301,7 @@ onMounted(() => {
 
       <footer class="footer">
         <span>TankVitals • IoT para monitoramento de aquicultura</span>
-        <span>Vue 3 + TypeScript + Chart.js</span>
+        <span>Vue 3 + TypeScript + Chart.js + Lucide</span>
       </footer>
     </main>
 

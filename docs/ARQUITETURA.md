@@ -127,8 +127,10 @@ senão o ingestor descarta a mensagem.
 3. Grandeza fora da faixa válida da tabela → **remove só aquele campo**, mantém
    o resto (sensor com defeito não derruba a leitura inteira).
 4. Nenhuma grandeza sobrou → descarta.
-5. `ts` ausente ou ≤ 1700000000 → usa o horário do servidor no momento do
-   recebimento.
+5. `ts` ausente, ≤ 1700000000 ou a mais de 60 s do relógio do servidor → usa
+   o horário do servidor no momento do recebimento. O desvio acontece de
+   verdade no Wokwi: o relógio do ESP32 anda no ritmo da simulação, 3 a 7
+   vezes mais lento, e o `ts` vai ficando no passado.
 6. `tank_id` do payload deve bater com o `<tank_id>` do tópico; se divergir,
    vale o do tópico e registra `WARNING`.
 
