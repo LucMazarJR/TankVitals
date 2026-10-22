@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Dashboard do 1º bimestre, ainda nas rotas antigas da API. A WEB-02 refaz a
 // tela com o cadastro novo e o store ao vivo.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getLatest, getTanks, getThresholds } from '../api/client'
 import BrandMark from '../components/BrandMark.vue'
 import StatusBar from '../components/StatusBar.vue'
@@ -11,8 +11,10 @@ import HistoryChart from '../components/HistoryChart.vue'
 import HistoryTable from '../components/HistoryTable.vue'
 import AlertsPanel from '../components/AlertsPanel.vue'
 import AnalysisPanel from '../components/AnalysisPanel.vue'
+import TankDiagram from '../components/TankDiagram.vue'
 import { useLiveReadings } from '../composables/useLiveReadings'
 import { useHistory } from '../composables/useHistory'
+import { useLiveStore } from '../stores/live'
 import { METRIC_ICON, LEVEL_ICON, UI_ICON } from '../icons'
 import {
   DEFAULT_THRESHOLDS,
@@ -52,6 +54,35 @@ const metricKeys: MetricKey[] = [
 ]
 
 const currentThreshold = computed(() => thresholds.value[selectedMetric.value])
+
+// O tanque em corte lê os atuadores do store ao vivo. Mensagem com mais de
+// 30 s conta como sem dados: o desenho para em vez de mostrar estado velho.
+const STALE_MS = 30_000
+const live = useLiveStore()
+const now = ref(Date.now())
+let clock: number | undefined
+
+function liveValue(device: string, field: string): unknown {
+  const msg = live.latest[device]
+  if (!msg || now.value - Date.parse(msg.ts) > STALE_MS) return undefined
+  return msg.payload[field]
+}
+
+function liveFlag(device: string, field: string): boolean | null {
+  const value = liveValue(device, field)
+  return typeof value === 'boolean' ? value : null
+}
+
+// O nível é o mesmo do cartão ao lado; o store ao vivo só cobre a falta dele.
+const tankLevel = computed<number | null>(() => {
+  const fromApi = reading.value?.metrics.level_pct?.value
+  if (typeof fromApi === 'number') return fromApi
+  const fromLive = liveValue('nivel-01', 'level_pct')
+  return typeof fromLive === 'number' ? fromLive : null
+})
+const aerator = computed(() => liveFlag('aerador-01', 'on'))
+const recirculation = computed(() => liveFlag('bomba-rec-01', 'running'))
+const refill = computed(() => liveFlag('bomba-repo-01', 'on'))
 
 const selectedStats = computed(() => stats.value?.metrics[selectedMetric.value])
 
@@ -137,7 +168,12 @@ function formatNumber(value: number | undefined, decimals = 1): string {
 
 onMounted(() => {
   void bootstrap()
+  clock = window.setInterval(() => {
+    now.value = Date.now()
+  }, 5000)
 })
+
+onUnmounted(() => window.clearInterval(clock))
 </script>
 
 <template>
@@ -176,15 +212,25 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="metrics-grid" aria-label="Indicadores atuais">
-        <MetricCard
-          v-for="key in metricKeys"
-          :key="key"
-          :icon="METRIC_ICON[key]"
-          :label="METRIC_META[key].label"
-          :metric="reading?.metrics[key]"
-          :threshold="thresholds[key]"
+      <section class="tank-overview" aria-label="O tanque agora">
+        <TankDiagram
+          :tank-id="tankId"
+          :level="tankLevel"
+          :aerator="aerator"
+          :recirculation="recirculation"
+          :refill="refill"
         />
+
+        <div class="metrics-grid" aria-label="Indicadores atuais">
+          <MetricCard
+            v-for="key in metricKeys"
+            :key="key"
+            :icon="METRIC_ICON[key]"
+            :label="METRIC_META[key].label"
+            :metric="reading?.metrics[key]"
+            :threshold="thresholds[key]"
+          />
+        </div>
       </section>
 
       <div v-if="liveError" class="inline-warning">

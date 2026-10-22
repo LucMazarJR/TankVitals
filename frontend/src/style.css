@@ -327,9 +327,34 @@ h1 {
    Leituras atuais
    --------------------------------------------------------------------------- */
 
+/* O tanque em corte e, ao lado, as leituras em grade de dois por dois. */
+.tank-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.tank-overview > .tank-panel {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+
+.tank-overview > .metrics-grid {
+  flex: 1.3 1 440px;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* Cartões esticam até a altura do tanque: o número desce e o selo fica no topo. */
+.tank-overview .metric-value {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
