@@ -148,7 +148,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
         color: 'rgba(15, 23, 42, 0.07)',
       },
       ticks: {
-        callback: (value) => `${value} ${meta.value.unit}`,
+        callback: (value) => `${Number(value).toLocaleString('pt-BR')} ${meta.value.unit}`,
       },
     },
   },
