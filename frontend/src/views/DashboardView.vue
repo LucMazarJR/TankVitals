@@ -3,6 +3,7 @@
 // tela com o cadastro novo e o store ao vivo.
 import { computed, onMounted, ref } from 'vue'
 import { getLatest, getTanks, getThresholds } from '../api/client'
+import BrandMark from '../components/BrandMark.vue'
 import StatusBar from '../components/StatusBar.vue'
 import MetricCard from '../components/MetricCard.vue'
 import RangeSelector from '../components/RangeSelector.vue'
@@ -294,7 +295,7 @@ onMounted(() => {
 
     <div v-if="bootstrapLoading" class="startup-overlay">
       <div class="startup-card">
-        <div class="brand-mark">TV</div>
+        <BrandMark :size="48" />
         <strong>Inicializando TankVitals</strong>
         <span>Conectando ao backend...</span>
         <span class="spinner" />

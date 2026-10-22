@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { LogOut, Menu, X } from 'lucide-vue-next'
+import BrandMark from '../components/BrandMark.vue'
 import { MOCK } from '../config'
 import { LIVE_STATUS_LABEL } from '../live/socket'
 import { MENU_GROUPS, PAGES } from '../router/pages'
@@ -44,7 +45,7 @@ onUnmounted(() => live.disconnect())
     <aside class="sidebar">
       <div class="sidebar-top">
         <RouterLink :to="{ name: 'dashboard' }" class="brand">
-          <span class="brand-mark">TV</span>
+          <BrandMark :size="38" />
           <span>
             <strong>TankVitals</strong>
             <small>Tanque e bomba ao vivo</small>

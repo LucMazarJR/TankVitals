@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { LogIn } from 'lucide-vue-next'
 import { ApiError } from '../api/http'
+import BrandMark from '../components/BrandMark.vue'
 import { MOCK } from '../config'
 import { MOCK_USERNAMES } from '../mock/auth'
 import { useAuthStore } from '../stores/auth'
@@ -63,7 +64,7 @@ function quickLogin(name: string) {
   <main class="login-page">
     <form class="login-card" @submit.prevent="submit">
       <div class="login-brand">
-        <span class="brand-mark">TV</span>
+        <BrandMark :size="38" />
         <div>
           <strong>TankVitals</strong>
           <small>Monitoramento do tanque e da bomba</small>
