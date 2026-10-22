@@ -46,6 +46,7 @@
   --metal: #5f6d77;
 
   /* Faixa ideal: na régua dos cartões e no gráfico. */
+  --track: #d8d0be;
   --ideal: #4aa574;
   --ideal-wash: #d9efe1;
   --ideal-line: #3a8a5c;
@@ -427,18 +428,39 @@ h1 {
   letter-spacing: 0;
 }
 
+/* Régua da faixa: trilha, banda verde da faixa ideal e o traço da leitura. */
+.metric-scale {
+  position: relative;
+  height: 8px;
+  margin-top: 16px;
+  border-radius: 4px;
+  background: var(--track);
+}
+
+.metric-scale-ideal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--ideal);
+}
+
+.metric-scale-mark {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 18px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: left 0.4s ease;
+}
+
 .metric-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
+  margin-top: 9px;
   color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 600;
-}
-
-.metric-indicator {
-  display: none;
 }
 
 /* ---------------------------------------------------------------------------
