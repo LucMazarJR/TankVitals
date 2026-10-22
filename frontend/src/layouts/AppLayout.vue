@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { LogOut, Menu, X } from 'lucide-vue-next'
 import BrandMark from '../components/BrandMark.vue'
+import DisplayMenu from '../components/DisplayMenu.vue'
 import { MOCK } from '../config'
 import { LIVE_STATUS_LABEL } from '../live/socket'
 import { MENU_GROUPS, PAGES } from '../router/pages'
@@ -90,6 +91,7 @@ onUnmounted(() => live.disconnect())
             <strong>{{ auth.username }}</strong>
             <span>{{ roleLabel }}</span>
           </div>
+          <DisplayMenu />
           <button type="button" class="logout" @click="auth.logout()">
             <LogOut :size="16" aria-hidden="true" />
             Sair
@@ -273,6 +275,7 @@ onUnmounted(() => live.disconnect())
 }
 
 .user {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -282,6 +285,7 @@ onUnmounted(() => live.disconnect())
 .user-info {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
   line-height: 1.25;
 }
