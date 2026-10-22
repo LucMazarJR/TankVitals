@@ -5,8 +5,7 @@ Dashboard em Vue 3 + TypeScript + Vite para o projeto de monitoramento IoT de ta
 ## Requisitos
 
 - Node.js
-- Backend TankVitals rodando em `http://localhost:8000` (para o dashboard; as
-  outras telas rodam sem backend no modo simulado)
+- Backend TankVitals só quando o modo simulado estiver desligado
 
 ## Instalação
 
@@ -28,17 +27,20 @@ Acesse `http://localhost:5173`.
 
 ## Modo simulado
 
-Enquanto o backend não tem o login (BACK-03) e o WebSocket com ticket
-(BACK-04), o app roda em **modo simulado** (`VITE_MOCK=true`, o padrão): o
-login e os dados ao vivo são gerados no próprio navegador, no mesmo formato que
-o backend vai mandar. Na tela de login há um botão para cada papel de teste:
-`visualizador`, `operador` e `admin`.
+Enquanto o backend não tem as rotas do 2º bimestre, o app roda em **modo
+simulado** (`VITE_MOCK=true`, o padrão): tudo é gerado no próprio navegador, no
+mesmo formato que o backend vai mandar. Na tela de login há um botão para cada
+papel de teste: `visualizador`, `operador` e `admin`.
 
-Quando o backend tiver essas rotas, ponha `VITE_MOCK=false` no `.env`. Nenhum
-outro código muda.
+O coração do modo simulado é a planta simulada (`src/mock/plant.ts`): o
+tanque, a bomba e os atuadores, no relógio combinado (1 s real = 1 min
+simulado). Ela nasce com 7 dias de histórico e responde o cadastro, o
+histórico, os alertas e os comandos; a regra do aerador, a reposição, a
+recirculação e a falha injetada funcionam. Dá para testar o fluxo Web → IoT
+inteiro sem backend.
 
-O dashboard ainda usa as rotas do 1º bimestre e mostra os dados reais do
-backend, com o modo simulado ligado ou não.
+Quando o backend tiver as rotas do contrato abaixo, ponha `VITE_MOCK=false` no
+`.env`. Nenhum outro código muda.
 
 ## Como o app está organizado (WEB-01)
 
@@ -51,6 +53,12 @@ backend, com o modo simulado ligado ou não.
 | `src/api/http.ts` | o cliente HTTP: manda o JWT e leva ao login quando a sessão acaba |
 | `src/mock/` | o login e a telemetria do modo simulado |
 | `src/components/RoleGate.vue` | esconde um trecho de quem não tem a permissão |
+| `src/domain/devices.ts` | os tipos do cadastro, do histórico, dos alertas e dos comandos (o contrato) |
+| `src/stores/devices.ts` | o cadastro de dispositivos, carregado uma vez para todas as telas |
+| `src/api/devices.ts` | as rotas de cadastro, histórico, alertas e comando |
+| `src/composables/useLiveValues.ts` | o "agora" de cada dispositivo, com "sem dados" depois de 10 s |
+| `src/components/ActuatorControl.vue` | o controle de atuador: estado, botão e "aguardando confirmação" |
+| `src/plant/layout.ts` | onde cada dispositivo do cadastro entra no desenho (e no 3D) |
 
 **Para fazer uma tela:** crie a view em `src/views/` e aponte o `component` dela
 em `src/router/pages.ts`. Enquanto ela não existe, a rota mostra um placeholder
@@ -64,7 +72,14 @@ com a tarefa e o que já está chegando no store ao vivo.
 </RoleGate>
 ```
 
-**Para ler o ao vivo:** `useLiveStore().latest['od-01']?.payload.oxygen_mg_l`.
+**Para ler o ao vivo:** `useLiveValues().value('od-01', 'oxygen_mg_l')`, que
+já devolve `null` quando a leitura ficou velha. O cru fica em
+`useLiveStore().latest['od-01']`.
+
+**Para montar uma tela a partir do cadastro:** `useDevicesStore()` tem os
+dispositivos ativos e as variáveis (`variables`), cada uma com nome, unidade,
+casas decimais e faixa. Nada de lista fixa de grandezas: o dashboard inteiro
+sai daí.
 Para os outros tipos de mensagem (progresso de job, alerta),
 `useLiveStore().subscribe(msg => ...)`.
 
@@ -104,20 +119,26 @@ npm run build
 npm run preview
 ```
 
-## Integração
+## Contrato com o backend
 
-O frontend não conversa diretamente com MQTT ou InfluxDB. Ele consome somente a API FastAPI:
+O frontend não conversa com MQTT, RabbitMQ ou InfluxDB: só com a API. Os
+formatos estão em `src/domain/devices.ts` e o modo simulado
+(`src/mock/registry.ts` e `src/mock/plant.ts`) responde exatamente assim.
 
-- `GET /api/health`
-- `GET /api/thresholds`
-- `GET /api/tanks`
-- `GET /api/readings/latest`
-- `GET /api/readings/history`
-- `GET /api/stats`
-- `WS /ws/live`
+| Rota | O que o front espera | Tarefa |
+| --- | --- | --- |
+| `POST /api/auth/login` | formulário `username` e `password`; devolve `{access_token, token_type}` | BACK-03 |
+| `POST /api/ws/ticket` | `{ticket}`, de uso único | BACK-04 |
+| `WS /ws/live?ticket=...` | um envelope `{id, ts, type, device, payload}` por mensagem: `telemetry`, `insight`, `alert`... | BACK-04 |
+| `GET /api/devices` | `[{id, name, kind, zone, active, fields, state_field, commands, control}]`; cada campo com `key, label, short, unit, decimals, range` | BACK-05 |
+| `GET /api/history?range=6h` | `{range, from, to, step_s, series}`; cada série com `device, field, points` (uns 360 pontos) e `stats` (`count, min, max, avg, last, out_of_range_s`; nos campos de estado, `on_s` e `turn_ons`). `&device=od-01` filtra | BACK-05 |
+| `GET /api/alerts?status=all` | `[{id, device, field, level, message, value, opened_at, closed_at}]`, os mais novos primeiro | BACK-05 |
+| `POST /api/devices/{id}/command` | corpo `{command: "on", value: true}` (ou `inject_fault` e `repair`); devolve `{id, status: "sent"}`. O estado novo chega pela telemetria | IOT-04 |
 
-O WebSocket é usado como canal principal. Após falhas consecutivas, o dashboard passa automaticamente para polling de `/api/readings/latest` a cada 5 segundos.
+As estatísticas do histórico são calculadas sobre as leituras cruas, não sobre
+os pontos agregados: é delas que saem o "tempo fora da faixa" e o "quantas
+vezes o aerador ligou" do dashboard.
 
 ## Observação sobre Chart.js
 
-O gráfico utiliza duas linhas tracejadas para representar os limites mínimo/máximo da faixa segura, evitando adicionar dependências extras ao projeto.
+O gráfico desenha os limites da faixa normal como linhas tracejadas e sombreia o espaço entre eles, sem dependência extra além do Chart.js.

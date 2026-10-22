@@ -14,8 +14,7 @@ import {
 import 'chartjs-adapter-date-fns'
 import { Line } from 'vue-chartjs'
 import type { ChartData, ChartOptions } from 'chart.js'
-import type { HistorySeries, MetricKey, MetricThreshold } from '../types'
-import { METRIC_META } from '../types'
+import type { HistoryPoint, MetricThreshold } from '../types'
 import { UI_ICON } from '../icons'
 import { usePreferences } from '../composables/usePreferences'
 
@@ -30,10 +29,13 @@ ChartJS.register(
   Filler,
 )
 
+// Uma variável qualquer do cadastro: quem chama passa os pontos, o nome, a
+// unidade e a faixa. O gráfico não sabe de nenhuma grandeza fixa.
 const props = defineProps<{
-  history: HistorySeries | null
-  metric: MetricKey
-  threshold?: MetricThreshold
+  points: HistoryPoint[]
+  label: string
+  unit: string
+  threshold?: MetricThreshold | null
   range: string
 }>()
 
@@ -55,23 +57,17 @@ const palette = computed(() => {
   }
 })
 
-const meta = computed(() => METRIC_META[props.metric])
-
-const currentSeries = computed(() =>
-  props.history?.series.find((item) => item.metric === props.metric),
-)
-
-const labels = computed(() => currentSeries.value?.points.map((point) => new Date(point.t)) ?? [])
+const labels = computed(() => props.points.map((point) => new Date(point.t)))
 
 // Linhas tracejadas da faixa segura, com os limites vindos da API.
 const safeMin = computed(() => props.threshold?.ok_min ?? undefined)
 const safeMax = computed(() => props.threshold?.ok_max ?? undefined)
 
 const chartData = computed<ChartData<'line', number[], Date>>(() => {
-  const points = currentSeries.value?.points ?? []
+  const points = props.points
   const datasets: ChartData<'line', number[], Date>['datasets'] = [
     {
-      label: meta.value.label,
+      label: props.label,
       data: points.map((point) => point.v),
       // Linha grossa e sem área embaixo: no projetor, área clara some e
       // linha fina falha.
@@ -142,7 +138,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
         label: (context) => {
           const value = context.parsed.y
           if (value === null) return ''
-          return `${context.dataset.label}: ${value.toLocaleString('pt-BR')} ${meta.value.unit}`
+          return `${context.dataset.label}: ${value.toLocaleString('pt-BR')} ${props.unit}`
         },
       },
     },
@@ -175,7 +171,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       ticks: {
         color: palette.value.texto,
         font: { family: palette.value.fonte, size: 12, weight: 700 },
-        callback: (value) => `${Number(value).toLocaleString('pt-BR')} ${meta.value.unit}`,
+        callback: (value) => `${Number(value).toLocaleString('pt-BR')} ${props.unit}`,
       },
     },
   },
@@ -184,7 +180,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 
 <template>
   <div class="chart-wrap">
-    <div v-if="!currentSeries || currentSeries.points.length === 0" class="chart-empty">
+    <div v-if="points.length === 0" class="chart-empty">
       <div class="empty-icon"><component :is="UI_ICON.semDado" :size="24" aria-hidden="true" /></div>
       <strong>Sem dados no período</strong>
       <span>Assim que houver leituras, elas aparecerão neste gráfico.</span>

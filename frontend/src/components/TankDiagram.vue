@@ -9,7 +9,6 @@ import { computed, useId } from 'vue'
  * `null` é "sem dados": a parte fica parada e o selo avisa.
  */
 const props = defineProps<{
-  tankId: string
   /** Nível da água, em %. */
   level: number | null
   aerator: boolean | null
@@ -79,12 +78,7 @@ const BUBBLES = [
 </script>
 
 <template>
-  <figure class="panel tank-panel">
-    <div class="tank-head">
-      <strong>{{ tankId }} em corte</strong>
-      <span>muda com cada leitura</span>
-    </div>
-
+  <figure class="tank-figure">
     <svg class="tank-svg" viewBox="-12 0 432 290" role="img" :aria-label="description">
       <defs>
         <clipPath :id="tankClip">
@@ -190,40 +184,12 @@ const BUBBLES = [
       </g>
     </svg>
 
-    <ul class="tank-states" aria-label="Atuadores">
-      <li v-for="item in actuators" :key="item.key" :class="['tank-state', `is-${item.state}`]">
-        <span class="tank-state-dot" aria-hidden="true" />
-        {{ item.label }} {{ item.text }}
-      </li>
-    </ul>
   </figure>
 </template>
 
 <style scoped>
-.tank-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.tank-figure {
   margin: 0;
-}
-
-.tank-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 8px;
-}
-
-.tank-head strong {
-  font-size: 1rem;
-  font-weight: var(--fw-heavy);
-}
-
-.tank-head span {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
 }
 
 .tank-svg {
@@ -400,63 +366,6 @@ const BUBBLES = [
   fill: var(--ink);
   font-size: 14px;
   font-weight: var(--fw-heavy);
-}
-
-.tank-states {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tank-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 32px;
-  padding: 0 11px;
-  border: var(--bw) solid transparent;
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  font-weight: var(--fw-heavy);
-}
-
-.tank-state-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-
-.tank-state.is-on {
-  color: #ffffff;
-  background: var(--accent);
-}
-
-.tank-state.is-on .tank-state-dot {
-  background: #ffffff;
-}
-
-.tank-state.is-off {
-  color: var(--ink);
-  border-color: var(--field);
-  background: var(--surface);
-}
-
-.tank-state.is-off .tank-state-dot {
-  border: 2px solid var(--ink);
-}
-
-.tank-state.is-unknown {
-  color: var(--muted);
-  border-color: var(--line);
-  border-style: dashed;
-  background: var(--surface);
-}
-
-.tank-state.is-unknown .tank-state-dot {
-  border: 2px dashed var(--muted);
 }
 
 @keyframes rise {

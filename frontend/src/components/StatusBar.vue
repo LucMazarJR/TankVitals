@@ -1,30 +1,47 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ConnectionMode, LatestReading } from '../types'
+import { useNow } from '../composables/useNow'
+import { STALE_AFTER_MS } from '../live/freshness'
+import type { LiveStatus } from '../live/socket'
 
 const props = defineProps<{
-  reading: LatestReading | null
-  connection: ConnectionMode
+  tankId: string
+  /** De onde vêm as leituras: "Simulador" ou "Modo simulado". */
+  source: string
+  /** Instante (ms) da última mensagem ao vivo, ou `null` se nada chegou. */
+  lastMessageAt: number | null
+  liveStatus: LiveStatus
 }>()
 
+const now = useNow()
+
+const ageSeconds = computed(() =>
+  props.lastMessageAt === null ? null : Math.max(0, Math.round((now.value - props.lastMessageAt) / 1000)),
+)
+
+const online = computed(() => props.lastMessageAt !== null && now.value - props.lastMessageAt <= STALE_AFTER_MS)
+
 const ageLabel = computed(() => {
-  if (!props.reading) return 'aguardando leitura'
-  if (props.reading.age_s < 1) return 'agora'
-  return `há ${Math.round(props.reading.age_s)} s`
+  if (ageSeconds.value === null) return 'aguardando'
+  if (ageSeconds.value < 1) return 'agora'
+  if (ageSeconds.value < 120) return `há ${ageSeconds.value} s`
+  return `há ${Math.round(ageSeconds.value / 60)} min`
 })
 
-const tankLabel = computed(() => props.reading?.tank_id ?? 'tanque-01')
+const statusText = computed(() => (online.value ? 'Recebendo' : 'Sem dados'))
 
-const deviceLabel = computed(() => props.reading?.device_id ?? 'dispositivo aguardando')
-
-const statusText = computed(() => {
-  if (!props.reading?.online) return 'Offline'
-  return 'Online'
+// Mapeia o estado da conexão nas três aparências do selo.
+const connection = computed(() => {
+  if (props.liveStatus === 'live' || props.liveStatus === 'simulated') return 'websocket'
+  if (props.liveStatus === 'connecting' || props.liveStatus === 'reconnecting') return 'polling'
+  return 'disconnected'
 })
 
 const connectionText = computed(() => {
-  if (props.connection === 'websocket') return 'Tempo real'
-  if (props.connection === 'polling') return 'Polling • 5 s'
+  if (props.liveStatus === 'live') return 'Tempo real'
+  if (props.liveStatus === 'simulated') return 'Simulado'
+  if (props.liveStatus === 'connecting') return 'Conectando'
+  if (props.liveStatus === 'reconnecting') return 'Reconectando'
   return 'Desconectado'
 })
 </script>
@@ -39,17 +56,17 @@ const connectionText = computed(() => {
     <div class="status-items">
       <div class="status-item">
         <span class="label">Tanque</span>
-        <strong>{{ tankLabel }}</strong>
+        <strong>{{ tankId }}</strong>
       </div>
 
       <div class="status-item">
-        <span class="label">Dispositivo</span>
-        <strong>{{ deviceLabel }}</strong>
+        <span class="label">Fonte</span>
+        <strong>{{ source }}</strong>
       </div>
 
       <div class="status-item">
-        <span class="label">Estado</span>
-        <strong :class="['status-pill', reading?.online ? 'is-online' : 'is-offline']">
+        <span class="label">Leituras</span>
+        <strong :class="['status-pill', online ? 'is-online' : 'is-offline']">
           <span class="dot" /> {{ statusText }}
         </strong>
       </div>

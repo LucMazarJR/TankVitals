@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
-    "mock": "node mock-server.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@fontsource/nunito-sans": "^5.3.0",

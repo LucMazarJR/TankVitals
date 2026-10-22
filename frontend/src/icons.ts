@@ -13,8 +13,14 @@ import {
   RadioTower,
   ChartNoAxesColumn,
   RefreshCw,
+  Droplets,
+  Sun,
+  Zap,
+  Gauge,
+  ThermometerSun,
 } from 'lucide-vue-next'
-import type { AlertLevel, MetricKey } from './types'
+import type { Component } from 'vue'
+import type { AlertLevel } from './types'
 
 /**
  * Ícones em um lugar só, para os componentes não importarem do lucide direto.
@@ -25,11 +31,25 @@ import type { AlertLevel, MetricKey } from './types'
  * lado do rótulo em texto, é o canal que não depende de enxergar cor.
  */
 
-export const METRIC_ICON: Record<MetricKey, typeof Thermometer> = {
+/**
+ * Ícone de cada variável, pelo nome do campo na telemetria. Campo que não está
+ * aqui (um sensor novo cadastrado pela tela) usa o medidor genérico.
+ */
+const FIELD_ICON: Record<string, Component> = {
   temperature_c: Thermometer,
   ph: FlaskConical,
   level_pct: Waves,
   turbidity_ntu: Microscope,
+  oxygen_mg_l: Droplets,
+  light_lux: Sun,
+  vibration_mm_s: Activity,
+  current_a: Zap,
+  motor_temp_c: ThermometerSun,
+  flow_l_min: Gauge,
+}
+
+export function fieldIcon(fieldKey: string): Component {
+  return FIELD_ICON[fieldKey] ?? Gauge
 }
 
 export const LEVEL_ICON: Record<AlertLevel, typeof CircleCheck> = {

@@ -1,297 +1,331 @@
 <script setup lang="ts">
-// Dashboard do 1º bimestre, ainda nas rotas antigas da API. A WEB-02 refaz a
-// tela com o cadastro novo e o store ao vivo.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { getLatest, getTanks, getThresholds } from '../api/client'
+// Dashboard ao vivo (WEB-02). Tudo aqui sai do cadastro de dispositivos: os
+// cartões, o seletor do gráfico, a análise e os controles. Um sensor novo
+// cadastrado aparece sem mudar esta tela.
+import { computed, onMounted, ref } from 'vue'
+import ActuatorControl from '../components/ActuatorControl.vue'
+import AlertsPanel from '../components/AlertsPanel.vue'
+import AnalysisPanel, { type AnalysisRow } from '../components/AnalysisPanel.vue'
 import BrandMark from '../components/BrandMark.vue'
-import StatusBar from '../components/StatusBar.vue'
-import MetricCard from '../components/MetricCard.vue'
-import RangeSelector from '../components/RangeSelector.vue'
 import HistoryChart from '../components/HistoryChart.vue'
 import HistoryTable from '../components/HistoryTable.vue'
-import AlertsPanel from '../components/AlertsPanel.vue'
-import AnalysisPanel from '../components/AnalysisPanel.vue'
+import MetricCard from '../components/MetricCard.vue'
+import RangeSelector from '../components/RangeSelector.vue'
+import StatusBar from '../components/StatusBar.vue'
 import TankDiagram from '../components/TankDiagram.vue'
-import { useLiveReadings } from '../composables/useLiveReadings'
-import { useHistory } from '../composables/useHistory'
+import { useAlerts } from '../composables/useAlerts'
+import { useHistoryData } from '../composables/useHistoryData'
+import { useLiveValues } from '../composables/useLiveValues'
+import { useNow } from '../composables/useNow'
+import { MOCK } from '../config'
+import { classify, worstLevel } from '../alerts'
+import { controllables, variablesOf, type Alert, type Device, type SeriesStats, type Variable } from '../domain/devices'
+import { fieldIcon, LEVEL_ICON, UI_ICON } from '../icons'
+import { TANK } from '../plant/layout'
+import { useDevicesStore } from '../stores/devices'
 import { useLiveStore } from '../stores/live'
-import { METRIC_ICON, LEVEL_ICON, UI_ICON } from '../icons'
-import {
-  DEFAULT_THRESHOLDS,
-  METRIC_META,
-  type HistoryRange,
-  type MetricKey,
-  type Thresholds,
-  type TankInfo,
-} from '../types'
+import type { AlertLevel, HistoryPoint, HistoryRange, MetricValue } from '../types'
 
-const tankId = ref('tanque-01')
-const tanks = ref<TankInfo[]>([])
-const thresholds = ref<Thresholds>(DEFAULT_THRESHOLDS)
-const range = ref<HistoryRange>('6h')
-const selectedMetric = ref<MetricKey>('temperature_c')
-
-const LEVEL_ICON_CRITICO = LEVEL_ICON.critico
-const LEVEL_ICON_ATENCAO = LEVEL_ICON.atencao
-
-const bootstrapLoading = ref(true)
-const bootstrapError = ref<string | null>(null)
-
-const { reading, connection, error: liveError, restart } = useLiveReadings(tankId)
-const {
-  history,
-  stats,
-  loading: historyLoading,
-  error: historyError,
-  atualizadoEm,
-} = useHistory(tankId, range)
-
-const metricKeys: MetricKey[] = [
-  'temperature_c',
-  'ph',
-  'level_pct',
-  'turbidity_ntu',
-]
-
-const currentThreshold = computed(() => thresholds.value[selectedMetric.value])
-
-// O tanque em corte lê os atuadores do store ao vivo. Mensagem com mais de
-// 30 s conta como sem dados: o desenho para em vez de mostrar estado velho.
-const STALE_MS = 30_000
+const devicesStore = useDevicesStore()
 const live = useLiveStore()
-const now = ref(Date.now())
-let clock: number | undefined
+const now = useNow()
+const { value, state } = useLiveValues()
 
-function liveValue(device: string, field: string): unknown {
-  const msg = live.latest[device]
-  if (!msg || now.value - Date.parse(msg.ts) > STALE_MS) return undefined
-  return msg.payload[field]
-}
-
-function liveFlag(device: string, field: string): boolean | null {
-  const value = liveValue(device, field)
-  return typeof value === 'boolean' ? value : null
-}
-
-// O nível é o mesmo do cartão ao lado; o store ao vivo só cobre a falta dele.
-const tankLevel = computed<number | null>(() => {
-  const fromApi = reading.value?.metrics.level_pct?.value
-  if (typeof fromApi === 'number') return fromApi
-  const fromLive = liveValue('nivel-01', 'level_pct')
-  return typeof fromLive === 'number' ? fromLive : null
-})
-const aerator = computed(() => liveFlag('aerador-01', 'on'))
-const recirculation = computed(() => liveFlag('bomba-rec-01', 'running'))
-const refill = computed(() => liveFlag('bomba-repo-01', 'on'))
-
-const selectedStats = computed(() => stats.value?.metrics[selectedMetric.value])
-
-const overallLabel = computed(() => {
-  if (!reading.value) return 'Aguardando dados'
-  if (!reading.value.online) return 'Sem sinal'
-  if (reading.value.level === 'critico') return 'Situação crítica'
-  if (reading.value.level === 'atencao') return 'Atenção necessária'
-  return 'Tanque estável'
-})
-
-const overallClass = computed(() => {
-  if (!reading.value?.online) return 'status-neutral'
-  return `status-${reading.value.level}`
-})
-
-async function bootstrap() {
-  bootstrapLoading.value = true
-  bootstrapError.value = null
-
-  try {
-    const [tankData, thresholdData] = await Promise.all([
-      getTanks(),
-      getThresholds(),
-    ])
-
-    tanks.value = tankData
-    thresholds.value = normalizeThresholds(thresholdData)
-
-    if (tankData.length && !tankData.some((tank) => tank.tank_id === tankId.value)) {
-      tankId.value = tankData[0].tank_id
-    }
-  } catch (err) {
-    bootstrapError.value =
-      err instanceof Error
-        ? err.message
-        : 'Não foi possível carregar as configurações do dashboard.'
-
-    // O front continua funcional com o contrato conhecido.
-    try {
-      const latest = await getLatest(tankId.value)
-      if (latest) reading.value = latest
-    } catch {
-      // O erro principal já está sendo mostrado na interface.
-    }
-  } finally {
-    bootstrapLoading.value = false
-  }
-}
-
-// O backend e a fonte dos limites (ARQUITETURA §5); os DEFAULT_THRESHOLDS
-// entram apenas para a grandeza que a API nao mandar.
-function normalizeThresholds(input: Thresholds): Thresholds {
-  const merged: Thresholds = { ...DEFAULT_THRESHOLDS }
-
-  for (const key of metricKeys) {
-    if (input[key]) merged[key] = input[key]
-  }
-
-  return merged
-}
-
-const atualizadoLabel = computed(() => {
-  if (!atualizadoEm.value) return ''
-  return atualizadoEm.value.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-})
-
-function selectTank(id: string) {
-  tankId.value = id
-}
-
-function formatNumber(value: number | undefined, decimals = 1): string {
-  if (value === undefined || Number.isNaN(value)) return '—'
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })
-}
+const range = ref<HistoryRange>('6h')
+const history = useHistoryData(range)
+const { alerts } = useAlerts()
 
 onMounted(() => {
-  void bootstrap()
-  clock = window.setInterval(() => {
-    now.value = Date.now()
-  }, 5000)
+  void devicesStore.load()
 })
 
-onUnmounted(() => window.clearInterval(clock))
+const RANGE_LABEL: Record<HistoryRange, string> = {
+  '1h': 'na última hora',
+  '6h': 'nas últimas 6 horas',
+  '24h': 'nas últimas 24 horas',
+  '7d': 'nos últimos 7 dias',
+}
+
+// --- o que existe, pelo cadastro ---------------------------------------------
+
+const sensors = computed(() => devicesStore.active.filter((device) => device.kind === 'sensor'))
+const equipment = computed(() => devicesStore.active.filter((device) => device.kind === 'equipment'))
+const waterVariables = computed(() => variablesOf(sensors.value))
+const controls = computed(() => controllables(devicesStore.active))
+
+/** Grupos do seletor do gráfico e da análise: a água e cada equipamento. */
+const groups = computed(() => [
+  { label: 'Água', variables: waterVariables.value },
+  ...equipment.value.map((device) => ({ label: device.name, variables: variablesOf([device]) })),
+])
+
+// --- o agora ------------------------------------------------------------------
+
+function liveMetric(variable: Variable): MetricValue | undefined {
+  const current = value(variable.device.id, variable.field.key)
+  if (current === null) return undefined
+  return { value: current, level: classify(current, variable.field.range), unit: variable.field.unit }
+}
+
+const overall = computed(() => {
+  const levels = devicesStore.variables
+    .map((variable) => liveMetric(variable)?.level)
+    .filter((level): level is AlertLevel => level !== undefined)
+  if (!levels.length) return { cls: 'status-neutral', text: 'Sem dados' }
+  const worst = worstLevel(levels)
+  if (worst === 'critico') return { cls: 'status-critico', text: 'Situação crítica' }
+  if (worst === 'atencao') return { cls: 'status-atencao', text: 'Atenção necessária' }
+  return { cls: 'status-ok', text: 'Tudo normal' }
+})
+
+const tankLevel = computed(() => value(TANK.level.device, TANK.level.field))
+const aerator = computed(() => state(TANK.aerator.device, TANK.aerator.field))
+const recirculation = computed(() => state(TANK.recirculation.device, TANK.recirculation.field))
+const refill = computed(() => state(TANK.refill.device, TANK.refill.field))
+
+function stateStatsOf(device: Device): SeriesStats | undefined {
+  if (!device.state_field) return undefined
+  return history.series(device.id, device.state_field)?.stats
+}
+
+/** Previsão da IA do equipamento, se chegou há pouco (as previsões são mais espaçadas). */
+function insightOf(device: Device): { health: number; rul_h: number } | null {
+  const msg = live.insights[device.id]
+  if (!msg || now.value - Date.parse(msg.ts) > 60_000) return null
+  const { health, rul_h: rul } = msg.payload
+  return typeof health === 'number' && typeof rul === 'number' ? { health, rul_h: rul } : null
+}
+
+function formatNumber(n: number | undefined, decimals: number): string {
+  if (n === undefined || Number.isNaN(n)) return '—'
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+// --- gráfico ------------------------------------------------------------------
+
+const selectedId = ref<string | null>(null)
+const selected = computed<Variable | undefined>(
+  () => devicesStore.variables.find((v) => v.id === selectedId.value) ?? devicesStore.variables[0],
+)
+const selectedSeries = computed(() =>
+  selected.value ? history.series(selected.value.device.id, selected.value.field.key) : undefined,
+)
+
+/** As leituras cruas mais recentes da grandeza do gráfico, do store ao vivo. */
+const recentReadings = computed<HistoryPoint[]>(() => {
+  const variable = selected.value
+  if (!variable) return []
+  const list = live.recent[variable.device.id] ?? []
+  const out: HistoryPoint[] = []
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const v = list[i].payload[variable.field.key]
+    if (typeof v === 'number') out.push({ t: list[i].ts, v })
+  }
+  return out
+})
+
+// --- análise ------------------------------------------------------------------
+
+const analysisRows = computed<AnalysisRow[]>(() =>
+  groups.value.flatMap((group) =>
+    group.variables.map((variable) => {
+      const series = history.series(variable.device.id, variable.field.key)
+      const metric = liveMetric(variable)
+      return {
+        id: variable.id,
+        group: group.label,
+        device: variable.device.id,
+        label: variable.field.short,
+        unit: variable.field.unit,
+        decimals: variable.field.decimals,
+        icon: fieldIcon(variable.field.key),
+        now: metric?.value ?? null,
+        // Sem faixa não há "normal" a dizer: a linha fica sem selo.
+        level: metric && variable.field.range ? metric.level : null,
+        stats: series?.stats,
+        points: series?.points.map((point) => point.v) ?? [],
+        range: variable.field.range,
+      }
+    }),
+  ),
+)
+
+const updatedLabel = computed(() =>
+  history.updatedAt.value
+    ? history.updatedAt.value.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '',
+)
+
+// --- alertas ------------------------------------------------------------------
+
+const openAlerts = computed(() => alerts.value.filter((alert) => alert.closed_at === null).length)
+
+function describeAlert(alert: Alert) {
+  const device = devicesStore.byId.get(alert.device)
+  const field = device?.fields.find((f) => f.key === alert.field)
+  return {
+    label: field?.short ?? device?.name ?? alert.device,
+    unit: field?.unit ?? '',
+    decimals: field?.decimals ?? 1,
+    icon: field ? fieldIcon(field.key) : UI_ICON.dispositivo,
+  }
+}
+
+const booting = computed(() => devicesStore.loading && !devicesStore.devices.length)
 </script>
 
 <template>
   <div class="app-shell">
-    <StatusBar :reading="reading" :connection="connection" />
+    <StatusBar
+      :tank-id="TANK.id"
+      :source="MOCK ? 'Modo simulado' : 'Simulador'"
+      :last-message-at="live.lastMessageAt"
+      :live-status="live.status"
+    />
 
     <main class="dashboard">
-      <div v-if="bootstrapError" class="global-error">
-        <component :is="LEVEL_ICON_CRITICO" :size="20" aria-hidden="true" />
+      <div v-if="devicesStore.error" class="global-error">
+        <component :is="LEVEL_ICON.critico" :size="20" aria-hidden="true" />
         <div>
-          <strong>Backend não disponível</strong>
-          <small>{{ bootstrapError }} — tentando manter a interface disponível.</small>
+          <strong>Não foi possível carregar o cadastro</strong>
+          <small>{{ devicesStore.error }}</small>
         </div>
-        <button type="button" @click="restart">Tentar novamente</button>
+        <button type="button" @click="devicesStore.load(true)">Tentar de novo</button>
       </div>
 
       <section class="dashboard-toolbar">
         <h2>Qualidade da água</h2>
 
         <div class="toolbar-controls">
-          <label v-if="tanks.length" class="select-field">
-            <span>Tanque</span>
-            <select :value="tankId" @change="selectTank(($event.target as HTMLSelectElement).value)">
-              <option v-for="tank in tanks" :key="tank.tank_id" :value="tank.tank_id">
-                {{ tank.tank_id }}
-              </option>
-            </select>
-          </label>
-
           <RangeSelector v-model="range" />
 
-          <div :class="['overall-status', overallClass]">
+          <div :class="['overall-status', overall.cls]" role="status">
             <span class="overall-dot" />
-            {{ overallLabel }}
+            {{ overall.text }}
           </div>
         </div>
       </section>
 
       <section class="tank-overview" aria-label="O tanque agora">
-        <TankDiagram
-          :tank-id="tankId"
-          :level="tankLevel"
-          :aerator="aerator"
-          :recirculation="recirculation"
-          :refill="refill"
-        />
+        <div class="panel tank-panel">
+          <div class="panel-header">
+            <h3>{{ TANK.id }} em corte</h3>
+            <span class="small-note">muda com cada leitura</span>
+          </div>
 
-        <div class="metrics-grid" aria-label="Indicadores atuais">
+          <TankDiagram :level="tankLevel" :aerator="aerator" :recirculation="recirculation" :refill="refill" />
+
+          <ul class="actuator-list" aria-label="Atuadores e bomba">
+            <ActuatorControl
+              v-for="device in controls"
+              :key="device.id"
+              :device="device"
+              :stats="stateStatsOf(device)"
+              :period-label="RANGE_LABEL[range]"
+            />
+          </ul>
+        </div>
+
+        <div class="metrics-grid" aria-label="Leituras da água">
           <MetricCard
-            v-for="key in metricKeys"
-            :key="key"
-            :icon="METRIC_ICON[key]"
-            :label="METRIC_META[key].label"
-            :metric="reading?.metrics[key]"
-            :threshold="thresholds[key]"
+            v-for="variable in waterVariables"
+            :key="variable.id"
+            :icon="fieldIcon(variable.field.key)"
+            :label="variable.field.label"
+            :metric="liveMetric(variable)"
+            :threshold="variable.field.range"
+            :decimals="variable.field.decimals"
+            :unit="variable.field.unit"
           />
         </div>
       </section>
 
-      <div v-if="liveError" class="inline-warning">
-        <component :is="LEVEL_ICON_ATENCAO" :size="16" aria-hidden="true" />
-        {{ liveError }}
-        <span v-if="connection === 'polling'"> O dashboard está usando consulta automática a cada 5 segundos.</span>
-      </div>
+      <section
+        v-for="device in equipment"
+        :key="device.id"
+        class="panel equipment-panel"
+        :aria-labelledby="`equipamento-${device.id}`"
+      >
+        <div class="panel-header">
+          <h3 :id="`equipamento-${device.id}`">{{ device.name }}</h3>
+          <span v-if="insightOf(device)" class="equipment-health">
+            Saúde prevista <strong>{{ formatNumber(insightOf(device)?.health, 0) }} %</strong>
+            · vida útil <strong>{{ formatNumber(insightOf(device)?.rul_h, 0) }} h</strong>
+          </span>
+          <span v-else class="small-note">sem previsão da IA ainda</span>
+        </div>
+
+        <div class="metrics-grid equipment-grid">
+          <MetricCard
+            v-for="variable in variablesOf([device])"
+            :key="variable.id"
+            :icon="fieldIcon(variable.field.key)"
+            :label="variable.field.label"
+            :metric="liveMetric(variable)"
+            :threshold="variable.field.range"
+            :decimals="variable.field.decimals"
+            :unit="variable.field.unit"
+          />
+        </div>
+      </section>
 
       <section class="panel chart-panel">
         <div class="panel-header">
           <h3>Evolução das leituras</h3>
 
-          <!-- Só a grandeza fica aqui: ela escopa apenas este gráfico.
-               O período subiu para a barra de cima, porque filtra vários painéis. -->
           <div class="chart-controls">
             <label class="select-field metric-select">
               <span>Grandeza</span>
-              <select v-model="selectedMetric">
-                <option v-for="key in metricKeys" :key="key" :value="key">
-                  {{ METRIC_META[key].shortLabel }}
-                </option>
+              <select
+                :value="selected?.id"
+                @change="selectedId = ($event.target as HTMLSelectElement).value"
+              >
+                <optgroup v-for="group in groups" :key="group.label" :label="group.label">
+                  <option v-for="variable in group.variables" :key="variable.id" :value="variable.id">
+                    {{ variable.field.short }}
+                  </option>
+                </optgroup>
               </select>
             </label>
           </div>
         </div>
 
-        <div v-if="historyLoading" class="loading-state">
+        <div v-if="history.loading.value && !selectedSeries" class="loading-state">
           <span class="spinner" />
-          Carregando histórico...
+          Carregando o histórico…
         </div>
 
-        <div v-else-if="historyError" class="error-state">
-          <component :is="LEVEL_ICON_CRITICO" :size="22" aria-hidden="true" />
+        <div v-else-if="history.error.value && !selectedSeries" class="error-state">
+          <component :is="LEVEL_ICON.critico" :size="22" aria-hidden="true" />
           <strong>Não foi possível carregar o histórico</strong>
-          <span>{{ historyError }}</span>
+          <span>{{ history.error.value }}</span>
         </div>
 
         <HistoryChart
-          v-else
-          :history="history"
-          :metric="selectedMetric"
-          :threshold="currentThreshold"
+          v-else-if="selected"
+          :points="selectedSeries?.points ?? []"
+          :label="selected.field.label"
+          :unit="selected.field.unit"
+          :threshold="selected.field.range"
           :range="range"
         />
 
-        <div v-if="selectedStats" class="stats-strip">
+        <div v-if="selected && selectedSeries" class="stats-strip">
           <div>
             <span>Mínimo</span>
-            <strong>{{ formatNumber(selectedStats.min, METRIC_META[selectedMetric].decimals) }}</strong>
+            <strong>{{ formatNumber(selectedSeries.stats.min, selected.field.decimals) }}</strong>
           </div>
           <div>
             <span>Média</span>
-            <strong>{{ formatNumber(selectedStats.avg, METRIC_META[selectedMetric].decimals) }}</strong>
+            <strong>{{ formatNumber(selectedSeries.stats.avg, selected.field.decimals) }}</strong>
           </div>
           <div>
             <span>Máximo</span>
-            <strong>{{ formatNumber(selectedStats.max, METRIC_META[selectedMetric].decimals) }}</strong>
+            <strong>{{ formatNumber(selectedSeries.stats.max, selected.field.decimals) }}</strong>
           </div>
           <div>
             <span>Último</span>
-            <strong>{{ formatNumber(selectedStats.last, METRIC_META[selectedMetric].decimals) }}</strong>
+            <strong>{{ formatNumber(selectedSeries.stats.last, selected.field.decimals) }}</strong>
           </div>
         </div>
       </section>
@@ -299,51 +333,50 @@ onUnmounted(() => window.clearInterval(clock))
       <section class="panel">
         <div class="panel-header compact">
           <h3>Comportamento no período</h3>
-          <span v-if="atualizadoLabel" class="small-note live-note">
+          <span v-if="updatedLabel" class="small-note live-note">
             <component :is="UI_ICON.atualizando" :size="13" aria-hidden="true" />
-            atualizado às {{ atualizadoLabel }}
+            atualizado às {{ updatedLabel }}
           </span>
         </div>
-        <AnalysisPanel
-          :history="history"
-          :stats="stats"
-          :thresholds="thresholds"
-          :reading="reading"
-          :range="range"
-        />
+        <AnalysisPanel :rows="analysisRows" :range="range" />
       </section>
 
       <section class="lower-grid">
         <div class="panel">
           <div class="panel-header compact">
-            <h3>Últimas leituras</h3>
-            <span class="small-note">máximo de 50 registros</span>
+            <h3>Últimas leituras{{ selected ? ` · ${selected.field.short}` : '' }}</h3>
+            <span class="small-note">as 50 mais recentes</span>
           </div>
-          <HistoryTable :history="history" :metric="selectedMetric" :threshold="currentThreshold" />
+          <HistoryTable
+            v-if="selected"
+            :readings="recentReadings"
+            :label="selected.field.label"
+            :unit="selected.field.unit"
+            :decimals="selected.field.decimals"
+            :threshold="selected.field.range"
+          />
         </div>
 
         <div class="panel">
           <div class="panel-header compact">
-            <h3>Alertas do período</h3>
-            <span class="alert-count">
-              {{ history?.series.length ? 'Atualizado' : '—' }}
-            </span>
+            <h3>Alertas</h3>
+            <span class="alert-count">{{ openAlerts ? `${openAlerts} aberto${openAlerts > 1 ? 's' : ''}` : 'nenhum aberto' }}</span>
           </div>
-          <AlertsPanel :history="history" :thresholds="thresholds" />
+          <AlertsPanel :alerts="alerts" :describe="describeAlert" />
         </div>
       </section>
 
       <footer class="footer">
         <span>TankVitals · monitoramento de aquicultura</span>
-        <span>{{ tankId }}</span>
+        <span>{{ TANK.id }}</span>
       </footer>
     </main>
 
-    <div v-if="bootstrapLoading" class="startup-overlay">
+    <div v-if="booting" class="startup-overlay">
       <div class="startup-card">
         <BrandMark :size="48" />
-        <strong>Inicializando TankVitals</strong>
-        <span>Conectando ao backend...</span>
+        <strong>TankVitals</strong>
+        <span>Carregando o cadastro…</span>
         <span class="spinner" />
       </div>
     </div>

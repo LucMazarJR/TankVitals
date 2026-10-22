@@ -410,6 +410,34 @@ h1 {
   margin-bottom: 0;
 }
 
+/* Painel do tanque: o desenho e, embaixo, os atuadores com os controles. */
+.tank-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.actuator-list {
+  margin: 6px 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+
+/* Equipamento (a bomba): faixa própria com as variáveis e a previsão da IA. */
+.equipment-panel .metrics-grid {
+  margin-bottom: 0;
+}
+
+.equipment-health {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.equipment-health strong {
+  color: var(--ink);
+  font-weight: var(--fw-heavy);
+}
+
 /* Cartões esticam até a altura do tanque: o número desce e o selo fica no topo. */
 .tank-overview .metric-value {
   margin-top: auto;
@@ -896,6 +924,13 @@ h1 {
   background: transparent;
 }
 
+/* Alerta já fechado: fica na lista como histórico, mais apagado. */
+.alert-row.is-closed .alert-symbol,
+.alert-row.is-closed .alert-info strong,
+.alert-row.is-closed .alert-value {
+  color: var(--muted);
+}
+
 .alert-symbol.badge-atencao {
   color: var(--atencao-mark);
 }
@@ -1213,6 +1248,21 @@ h1 {
   color: var(--muted);
   font-size: 0.8125rem;
   font-weight: var(--fw-bold);
+}
+
+/* Linha de grupo da tabela: "Água", "Bomba de recirculação"... */
+.analise-tabela .analise-grupo th {
+  padding: 16px 10px 6px;
+  border-bottom: var(--bw) solid var(--line);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-heavy);
+  text-align: left;
+}
+
+.analise-sem-faixa {
+  color: var(--faint);
+  font-size: 0.8125rem;
 }
 
 /* Ink de status: a cor acompanha o ícone, nunca o texto do valor. */
