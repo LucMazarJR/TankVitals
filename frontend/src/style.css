@@ -990,21 +990,21 @@ h1 {
   font-weight: 600;
 }
 
+/* Fica célula de tabela: com display flex as bordas da linha desalinhavam. */
 .analise-grandeza {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
 }
 
 .analise-grandeza svg {
+  margin-right: 8px;
   color: var(--muted);
-  flex-shrink: 0;
+  vertical-align: -3px;
 }
 
 .analise-grandeza small {
+  margin-left: 6px;
   font-weight: 500;
   color: var(--muted);
 }
