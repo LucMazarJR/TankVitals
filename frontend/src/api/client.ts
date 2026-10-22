@@ -7,32 +7,9 @@ import type {
   Thresholds,
   TankInfo,
 } from '../types'
+import { request, wsUrl } from './http'
 
-const configuredBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ?? ''
-const API_BASE = configuredBase.replace(/\/$/, '')
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...init?.headers,
-    },
-  })
-
-  if (!response.ok) {
-    let detail = `Erro HTTP ${response.status}`
-    try {
-      const body = (await response.json()) as { detail?: string }
-      if (body.detail) detail = body.detail
-    } catch {
-      // Mantém a mensagem HTTP quando a resposta não for JSON.
-    }
-    throw new Error(detail)
-  }
-
-  return (await response.json()) as T
-}
+// Rotas do 1º bimestre, que o dashboard ainda usa até a WEB-02.
 
 export function getHealth(): Promise<HealthResponse> {
   return request<HealthResponse>('/api/health')
@@ -74,14 +51,5 @@ export function getStats(tankId: string, range: HistoryRange): Promise<Stats> {
 }
 
 export function getWebSocketUrl(tankId: string): string {
-  if (!API_BASE) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${protocol}//${window.location.host}/ws/live?tank_id=${encodeURIComponent(tankId)}`
-  }
-
-  const url = new URL(API_BASE, window.location.origin)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  url.pathname = `${url.pathname.replace(/\/$/, '')}/ws/live`
-  url.search = `?tank_id=${encodeURIComponent(tankId)}`
-  return url.toString()
+  return wsUrl('/ws/live', { tank_id: tankId })
 }

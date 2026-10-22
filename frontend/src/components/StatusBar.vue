@@ -31,10 +31,10 @@ const connectionText = computed(() => {
 
 <template>
   <section class="status-bar">
+    <!-- A marca TankVitals fica no menu lateral; aqui só o título da tela. -->
     <div class="status-title">
-      <div class="brand-mark">TV</div>
       <div>
-        <span class="eyebrow">TANKVITALS</span>
+        <span class="eyebrow">DASHBOARD</span>
         <h1>Monitoramento do tanque</h1>
       </div>
     </div>
