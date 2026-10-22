@@ -54,3 +54,25 @@ export function safeRangeLabel(threshold: MetricThreshold | undefined, unit: str
 
   return 'faixa segura não disponível'
 }
+
+/**
+ * Classifica um valor pela faixa do cadastro (`DeviceField.range`). É a mesma
+ * regra para qualquer variável: fora da crítica é crítico, fora da normal é
+ * atenção. Sem faixa, tudo é normal.
+ */
+export function classify(value: number, range: MetricThreshold | null | undefined): AlertLevel {
+  if (!range) return 'ok'
+  const { ok_min, ok_max, crit_min, crit_max } = range
+  if ((crit_min !== null && value < crit_min) || (crit_max !== null && value > crit_max)) return 'critico'
+  if ((ok_min !== null && value < ok_min) || (ok_max !== null && value > ok_max)) return 'atencao'
+  return 'ok'
+}
+
+const LEVEL_WEIGHT: Record<AlertLevel, number> = { ok: 0, atencao: 1, critico: 2 }
+
+/** O pior nível de uma lista: um crítico qualquer manda na situação geral. */
+export function worstLevel(levels: Iterable<AlertLevel>): AlertLevel {
+  let worst: AlertLevel = 'ok'
+  for (const level of levels) if (LEVEL_WEIGHT[level] > LEVEL_WEIGHT[worst]) worst = level
+  return worst
+}
