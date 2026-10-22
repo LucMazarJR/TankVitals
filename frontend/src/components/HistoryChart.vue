@@ -17,7 +17,7 @@ import type { ChartData, ChartOptions } from 'chart.js'
 import type { HistorySeries, MetricKey, MetricThreshold } from '../types'
 import { METRIC_META } from '../types'
 import { UI_ICON } from '../icons'
-import { useContrast } from '../composables/useContrast'
+import { usePreferences } from '../composables/usePreferences'
 
 ChartJS.register(
   CategoryScale,
@@ -39,9 +39,9 @@ const props = defineProps<{
 
 // Lidos do CSS na hora de desenhar, e lidos de novo quando o contraste muda:
 // os tokens são outros em cada modo.
-const { contrast } = useContrast()
+const preferences = usePreferences()
 const palette = computed(() => {
-  void contrast.value
+  void preferences.contrast
   const css = getComputedStyle(document.documentElement)
   const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
   return {

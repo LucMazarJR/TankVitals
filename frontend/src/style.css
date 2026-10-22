@@ -1,10 +1,11 @@
 /* ---------------------------------------------------------------------------
    Tema "tanque em corte": areia, água e azul-marinho.
-   Dois níveis de contraste, com as mesmas cores nos mesmos papéis:
-   - natural (padrão): bordas finas e tons mais suaves, para o dia a dia;
-   - alto (`data-contrast="alto"` no <html>): para o projetor fraco da
-     apresentação, com o fundo de areia mais escuro que os painéis, bordas
-     mais grossas e tons mais fechados.
+   Dois níveis de contraste, com as mesmas cores nos mesmos papéis, escolhidos
+   por cada pessoa no menu do usuário (src/composables/usePreferences.ts):
+   - padrão: bordas finas e tons mais suaves;
+   - alto (`data-contrast="alto"` no <html>): fundo mais escuro que os painéis,
+     bordas mais grossas, tons mais fechados e títulos mais pesados. Pensado
+     para tela com pouco brilho, como o projetor da sala da apresentação.
    Nos dois, os estados vêm em cor sólida e sempre com o nome escrito.
    --------------------------------------------------------------------------- */
 
@@ -25,7 +26,7 @@
   --bw-strong: 1.5px;
   --bw-alert: 2px;
 
-  /* Peso dos títulos e dos números: mais leve no natural. */
+  /* Peso dos títulos e dos números: mais leve no padrão. */
   --fw-heavy: 700;
   --fw-bold: 600;
 
@@ -87,7 +88,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Alto contraste: os valores pensados para o projetor fraco. */
+/* Alto contraste. */
 :root[data-contrast="alto"] {
   --background: #ede8dc;
   --surface-2: #f6f3ec;
