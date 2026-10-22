@@ -57,7 +57,7 @@ const page = computed(() => route.meta.page)
 
 .page-header h2 {
   font-size: 1.75rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   letter-spacing: -0.015em;
   line-height: 1.2;
 }
@@ -72,10 +72,10 @@ const page = computed(() => route.meta.page)
 .page-action {
   min-height: 42px;
   padding: 0 16px;
-  border: 1.5px solid var(--field);
+  border: var(--bw) solid var(--field);
   border-radius: var(--radius-sm);
   color: var(--muted);
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: var(--surface);
 }
 
@@ -99,7 +99,7 @@ const page = computed(() => route.meta.page)
 
 .placeholder strong {
   color: var(--ink);
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .placeholder svg {

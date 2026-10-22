@@ -153,7 +153,7 @@ onUnmounted(() => live.disconnect())
 
 .brand strong {
   font-size: 1.1875rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -169,7 +169,7 @@ onUnmounted(() => live.disconnect())
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1.5px solid var(--night-line);
+  border: var(--bw) solid var(--night-line);
   border-radius: var(--radius-sm);
   color: #ffffff;
   background: transparent;
@@ -192,7 +192,7 @@ onUnmounted(() => live.disconnect())
   padding: 0 10px 4px;
   color: var(--night-muted);
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .nav-link {
@@ -218,7 +218,7 @@ onUnmounted(() => live.disconnect())
 
 .nav-link.active {
   color: #ffffff;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: var(--night-active);
 }
 
@@ -236,7 +236,7 @@ onUnmounted(() => live.disconnect())
   flex-direction: column;
   gap: 12px;
   padding: 14px 8px 0;
-  border-top: 1.5px solid var(--night-line);
+  border-top: var(--bw) solid var(--night-line);
 }
 
 .live-state {
@@ -245,7 +245,7 @@ onUnmounted(() => live.disconnect())
   gap: 8px;
   color: var(--night-muted);
   font-size: 0.8125rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .live-state-dot {
@@ -288,7 +288,7 @@ onUnmounted(() => live.disconnect())
 
 .user-info strong {
   overflow: hidden;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -305,11 +305,11 @@ onUnmounted(() => live.disconnect())
   gap: 6px;
   min-height: 40px;
   padding: 0 12px;
-  border: 1.5px solid var(--night-muted);
+  border: var(--bw) solid var(--night-muted);
   border-radius: var(--radius-sm);
   color: #ffffff;
   font-size: 0.8125rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: transparent;
 }
 
@@ -319,7 +319,7 @@ onUnmounted(() => live.disconnect())
 
 .mock-note {
   padding: 8px 10px;
-  border: 1.5px dashed var(--night-line);
+  border: var(--bw) dashed var(--night-line);
   border-radius: var(--radius-sm);
   color: var(--night-muted);
   font-size: 0.75rem;

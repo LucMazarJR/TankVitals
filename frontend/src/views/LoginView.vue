@@ -124,7 +124,7 @@ function quickLogin(name: string) {
 .login-card {
   width: min(100%, 410px);
   overflow: hidden;
-  border: 1.5px solid var(--line);
+  border: var(--bw) solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -147,7 +147,7 @@ function quickLogin(name: string) {
 
 .login-head strong {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -189,13 +189,13 @@ function quickLogin(name: string) {
   gap: 5px;
   color: var(--muted);
   font-size: 0.8125rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .field input {
   min-height: 44px;
   padding: 0 12px;
-  border: 1.5px solid var(--field);
+  border: var(--bw) solid var(--field);
   border-radius: var(--radius-sm);
   color: var(--ink);
   font-size: 0.9375rem;
@@ -206,7 +206,7 @@ function quickLogin(name: string) {
 .login-notice,
 .login-error {
   padding: 10px 12px;
-  border: 1.5px solid;
+  border: var(--bw) solid;
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 600;
@@ -230,7 +230,7 @@ function quickLogin(name: string) {
   border-radius: var(--radius-sm);
   color: #ffffff;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: var(--night);
 }
 
@@ -248,7 +248,7 @@ function quickLogin(name: string) {
   flex-direction: column;
   gap: 8px;
   padding: 14px 24px 20px;
-  border-top: 1.5px solid var(--line-soft);
+  border-top: var(--bw) solid var(--line-soft);
   background: var(--surface-2);
 }
 
@@ -267,11 +267,11 @@ function quickLogin(name: string) {
 .login-mock-users button {
   min-height: 40px;
   padding: 0 14px;
-  border: 1.5px solid var(--field);
+  border: var(--bw) solid var(--field);
   border-radius: 999px;
   color: var(--ink);
   font-size: 0.875rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: var(--surface);
 }
 
