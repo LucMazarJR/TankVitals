@@ -1,5 +1,10 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+// Fonte servida pelo próprio app: a apresentação não depende de internet.
+import '@fontsource/nunito-sans/400.css'
+import '@fontsource/nunito-sans/600.css'
+import '@fontsource/nunito-sans/700.css'
+import '@fontsource/nunito-sans/800.css'
 import './style.css'
 import App from './App.vue'
 import router from './router'

@@ -33,10 +33,7 @@ const connectionText = computed(() => {
   <section class="status-bar">
     <!-- A marca TankVitals fica no menu lateral; aqui só o título da tela. -->
     <div class="status-title">
-      <div>
-        <span class="eyebrow">DASHBOARD</span>
-        <h1>Monitoramento do tanque</h1>
-      </div>
+      <h1>Monitoramento do tanque</h1>
     </div>
 
     <div class="status-items">

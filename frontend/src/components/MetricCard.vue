@@ -23,12 +23,44 @@ const valueLabel = computed(() => {
 
 // A unidade vem da leitura; se ela ainda nao chegou, o card mostra so o valor.
 const safeRange = computed(() => safeRangeLabel(props.threshold, props.metric?.unit ?? ''))
+
+/**
+ * Régua da faixa: a trilha vai um pouco além dos limites críticos, a banda
+ * verde é a faixa ideal e o traço é a leitura atual. Em % a régua vai sempre
+ * de 0 a 100. Sem os dois limites não há como montar a escala, e a régua some.
+ */
+const scale = computed(() => {
+  const t = props.threshold
+  const value = props.metric?.value
+  if (!t || value === undefined || value === null || Number.isNaN(value)) return null
+
+  let min: number
+  let max: number
+  const lo = t.crit_min ?? t.ok_min
+  const hi = t.crit_max ?? t.ok_max
+  if (props.metric?.unit === '%') {
+    min = 0
+    max = 100
+  } else if (lo !== null && hi !== null && hi > lo) {
+    const pad = (hi - lo) * 0.25
+    // Grandeza física que não fica negativa (turbidez) não ganha trilha abaixo de 0.
+    min = lo >= 0 ? Math.max(0, lo - pad) : lo - pad
+    max = hi + pad
+  } else {
+    return null
+  }
+
+  const pos = (x: number) => ((Math.min(max, Math.max(min, x)) - min) / (max - min)) * 100
+  const from = pos(t.ok_min ?? min)
+  const to = pos(t.ok_max ?? max)
+  return { left: `${from}%`, width: `${to - from}%`, at: `${pos(value)}%` }
+})
 </script>
 
 <template>
   <article :class="['metric-card', `level-${metric?.level ?? 'ok'}`]">
     <div class="metric-head">
-      <div class="metric-icon"><component :is="icon" :size="18" aria-hidden="true" /></div>
+      <span class="metric-icon"><component :is="icon" :size="19" aria-hidden="true" /></span>
       <span class="metric-label">{{ label }}</span>
       <span v-if="metric" :class="['level-badge', `badge-${metric.level}`]">
         <component :is="LEVEL_ICON[metric.level]" :size="13" aria-hidden="true" />
@@ -45,9 +77,11 @@ const safeRange = computed(() => safeRangeLabel(props.threshold, props.metric?.u
       <span v-if="metric" class="metric-unit">{{ metric.unit }}</span>
     </div>
 
-    <div class="metric-footer">
-      <span>{{ safeRange }}</span>
-      <span v-if="metric" class="metric-indicator" aria-hidden="true" />
+    <div v-if="scale" class="metric-scale" aria-hidden="true">
+      <span class="metric-scale-ideal" :style="{ left: scale.left, width: scale.width }" />
+      <span class="metric-scale-mark" :style="{ left: scale.at }" />
     </div>
+
+    <div class="metric-footer">{{ safeRange }}</div>
   </article>
 </template>

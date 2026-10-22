@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Dashboard do 1º bimestre, ainda nas rotas antigas da API. A WEB-02 refaz a
 // tela com o cadastro novo e o store ao vivo.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getLatest, getTanks, getThresholds } from '../api/client'
+import BrandMark from '../components/BrandMark.vue'
 import StatusBar from '../components/StatusBar.vue'
 import MetricCard from '../components/MetricCard.vue'
 import RangeSelector from '../components/RangeSelector.vue'
@@ -10,8 +11,10 @@ import HistoryChart from '../components/HistoryChart.vue'
 import HistoryTable from '../components/HistoryTable.vue'
 import AlertsPanel from '../components/AlertsPanel.vue'
 import AnalysisPanel from '../components/AnalysisPanel.vue'
+import TankDiagram from '../components/TankDiagram.vue'
 import { useLiveReadings } from '../composables/useLiveReadings'
 import { useHistory } from '../composables/useHistory'
+import { useLiveStore } from '../stores/live'
 import { METRIC_ICON, LEVEL_ICON, UI_ICON } from '../icons'
 import {
   DEFAULT_THRESHOLDS,
@@ -51,6 +54,35 @@ const metricKeys: MetricKey[] = [
 ]
 
 const currentThreshold = computed(() => thresholds.value[selectedMetric.value])
+
+// O tanque em corte lê os atuadores do store ao vivo. Mensagem com mais de
+// 30 s conta como sem dados: o desenho para em vez de mostrar estado velho.
+const STALE_MS = 30_000
+const live = useLiveStore()
+const now = ref(Date.now())
+let clock: number | undefined
+
+function liveValue(device: string, field: string): unknown {
+  const msg = live.latest[device]
+  if (!msg || now.value - Date.parse(msg.ts) > STALE_MS) return undefined
+  return msg.payload[field]
+}
+
+function liveFlag(device: string, field: string): boolean | null {
+  const value = liveValue(device, field)
+  return typeof value === 'boolean' ? value : null
+}
+
+// O nível é o mesmo do cartão ao lado; o store ao vivo só cobre a falta dele.
+const tankLevel = computed<number | null>(() => {
+  const fromApi = reading.value?.metrics.level_pct?.value
+  if (typeof fromApi === 'number') return fromApi
+  const fromLive = liveValue('nivel-01', 'level_pct')
+  return typeof fromLive === 'number' ? fromLive : null
+})
+const aerator = computed(() => liveFlag('aerador-01', 'on'))
+const recirculation = computed(() => liveFlag('bomba-rec-01', 'running'))
+const refill = computed(() => liveFlag('bomba-repo-01', 'on'))
 
 const selectedStats = computed(() => stats.value?.metrics[selectedMetric.value])
 
@@ -136,7 +168,12 @@ function formatNumber(value: number | undefined, decimals = 1): string {
 
 onMounted(() => {
   void bootstrap()
+  clock = window.setInterval(() => {
+    now.value = Date.now()
+  }, 5000)
 })
+
+onUnmounted(() => window.clearInterval(clock))
 </script>
 
 <template>
@@ -154,10 +191,7 @@ onMounted(() => {
       </div>
 
       <section class="dashboard-toolbar">
-        <div>
-          <span class="eyebrow">VISÃO GERAL</span>
-          <h2>Qualidade da água</h2>
-        </div>
+        <h2>Qualidade da água</h2>
 
         <div class="toolbar-controls">
           <label v-if="tanks.length" class="select-field">
@@ -178,15 +212,25 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="metrics-grid" aria-label="Indicadores atuais">
-        <MetricCard
-          v-for="key in metricKeys"
-          :key="key"
-          :icon="METRIC_ICON[key]"
-          :label="METRIC_META[key].label"
-          :metric="reading?.metrics[key]"
-          :threshold="thresholds[key]"
+      <section class="tank-overview" aria-label="O tanque agora">
+        <TankDiagram
+          :tank-id="tankId"
+          :level="tankLevel"
+          :aerator="aerator"
+          :recirculation="recirculation"
+          :refill="refill"
         />
+
+        <div class="metrics-grid" aria-label="Indicadores atuais">
+          <MetricCard
+            v-for="key in metricKeys"
+            :key="key"
+            :icon="METRIC_ICON[key]"
+            :label="METRIC_META[key].label"
+            :metric="reading?.metrics[key]"
+            :threshold="thresholds[key]"
+          />
+        </div>
       </section>
 
       <div v-if="liveError" class="inline-warning">
@@ -197,10 +241,7 @@ onMounted(() => {
 
       <section class="panel chart-panel">
         <div class="panel-header">
-          <div>
-            <span class="eyebrow">HISTÓRICO</span>
-            <h3>Evolução das leituras</h3>
-          </div>
+          <h3>Evolução das leituras</h3>
 
           <!-- Só a grandeza fica aqui: ela escopa apenas este gráfico.
                O período subiu para a barra de cima, porque filtra vários painéis. -->
@@ -257,10 +298,7 @@ onMounted(() => {
 
       <section class="panel">
         <div class="panel-header compact">
-          <div>
-            <span class="eyebrow">ANÁLISE</span>
-            <h3>Comportamento no período</h3>
-          </div>
+          <h3>Comportamento no período</h3>
           <span v-if="atualizadoLabel" class="small-note live-note">
             <component :is="UI_ICON.atualizando" :size="13" aria-hidden="true" />
             atualizado às {{ atualizadoLabel }}
@@ -278,10 +316,7 @@ onMounted(() => {
       <section class="lower-grid">
         <div class="panel">
           <div class="panel-header compact">
-            <div>
-              <span class="eyebrow">DADOS</span>
-              <h3>Últimas leituras</h3>
-            </div>
+            <h3>Últimas leituras</h3>
             <span class="small-note">máximo de 50 registros</span>
           </div>
           <HistoryTable :history="history" :metric="selectedMetric" :threshold="currentThreshold" />
@@ -289,10 +324,7 @@ onMounted(() => {
 
         <div class="panel">
           <div class="panel-header compact">
-            <div>
-              <span class="eyebrow">MONITORAMENTO</span>
-              <h3>Alertas do período</h3>
-            </div>
+            <h3>Alertas do período</h3>
             <span class="alert-count">
               {{ history?.series.length ? 'Atualizado' : '—' }}
             </span>
@@ -302,14 +334,14 @@ onMounted(() => {
       </section>
 
       <footer class="footer">
-        <span>TankVitals • IoT para monitoramento de aquicultura</span>
-        <span>Vue 3 + TypeScript + Chart.js + Lucide</span>
+        <span>TankVitals · monitoramento de aquicultura</span>
+        <span>{{ tankId }}</span>
       </footer>
     </main>
 
     <div v-if="bootstrapLoading" class="startup-overlay">
       <div class="startup-card">
-        <div class="brand-mark">TV</div>
+        <BrandMark :size="48" />
         <strong>Inicializando TankVitals</strong>
         <span>Conectando ao backend...</span>
         <span class="spinner" />

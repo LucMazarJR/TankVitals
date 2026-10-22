@@ -68,6 +68,28 @@ com a tarefa e o que já está chegando no store ao vivo.
 Para os outros tipos de mensagem (progresso de job, alerta),
 `useLiveStore().subscribe(msg => ...)`.
 
+## Visual
+
+O tema é o "tanque em corte": areia, água e azul-marinho, com o peixe como
+marca. A apresentação é num projetor fraco, então o visual segue três regras:
+
+- painel branco com borda de 1,5 px sobre o fundo de areia, nunca só sombra;
+- estado em selo de cor sólida e com o nome escrito (`badge-ok`,
+  `badge-atencao`, `badge-critico`), nunca só a cor;
+- texto secundário em `var(--muted)`, nada de cinza-claro.
+
+| Onde | O quê |
+| --- | --- |
+| `src/style.css` | os tokens (`--night`, `--accent`, `--nivel-*`, `--water`...) e as classes do dashboard (`.panel`, `.panel-header`, `.level-badge`...) |
+| `src/components/BrandMark.vue` | a marca: o peixe com o batimento |
+| `src/components/TankDiagram.vue` | o tanque em corte, movido pelo nível e pelos atuadores ao vivo |
+| `src/components/MetricCard.vue` | o cartão de leitura com a régua da faixa ideal |
+
+**Para uma tela nova:** monte com `.panel` e um `.panel-header` (título em
+`h3`), e pegue as cores dos tokens, nunca em hex solto. O tanque recebe tudo
+por props (`level`, `aerator`, `recirculation`, `refill`), e `null` quer
+dizer "sem dados".
+
 ## Build
 
 ```bash

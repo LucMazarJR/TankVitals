@@ -14,7 +14,6 @@ const page = computed(() => route.meta.page)
   <main v-if="page" class="dashboard">
     <header class="page-header">
       <div>
-        <span class="eyebrow">{{ page.group.toUpperCase() }}</span>
         <h2>{{ page.title }}</h2>
         <p v-if="page.description">{{ page.description }}</p>
       </div>
@@ -39,10 +38,7 @@ const page = computed(() => route.meta.page)
 
     <section class="panel">
       <div class="panel-header compact">
-        <div>
-          <span class="eyebrow">STORE AO VIVO</span>
-          <h3>O que já está chegando</h3>
-        </div>
+        <h3>O que já está chegando pelo store ao vivo</h3>
       </div>
       <LiveSnapshot />
     </section>
@@ -52,29 +48,34 @@ const page = computed(() => route.meta.page)
 <style scoped>
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px 16px;
+  margin-bottom: 18px;
 }
 
 .page-header h2 {
-  font-size: 1.55rem;
-  letter-spacing: -0.03em;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .page-header p {
   max-width: 640px;
   margin-top: 6px;
   color: var(--muted);
+  font-weight: 600;
 }
 
 .page-action {
-  padding: 9px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1.5px solid var(--field);
+  border-radius: var(--radius-sm);
   color: var(--muted);
-  font-weight: 650;
+  font-weight: 800;
   background: var(--surface);
 }
 
@@ -82,11 +83,12 @@ const page = computed(() => route.meta.page)
   cursor: not-allowed;
 }
 
+/* Borda tracejada: a tela ainda não existe. */
 .placeholder {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 16px;
+  border-style: dashed;
   color: var(--muted);
 }
 
@@ -97,5 +99,11 @@ const page = computed(() => route.meta.page)
 
 .placeholder strong {
   color: var(--ink);
+  font-weight: 800;
+}
+
+.placeholder svg {
+  flex: 0 0 auto;
+  color: var(--atencao-mark);
 }
 </style>
