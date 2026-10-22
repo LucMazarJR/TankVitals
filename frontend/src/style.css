@@ -598,7 +598,7 @@ h1 {
 
 .lower-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
   gap: 16px;
 }
 
@@ -803,7 +803,7 @@ h1 {
   }
 
   .lower-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
