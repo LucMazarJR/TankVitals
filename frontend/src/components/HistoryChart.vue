@@ -38,9 +38,14 @@ const props = defineProps<{
 
 // Lidos do CSS para não duplicar hex entre folha de estilo e componente.
 const css = getComputedStyle(document.documentElement)
-const SERIE = css.getPropertyValue('--serie-1').trim() || '#2a78d6'
-const SERIE_WASH = 'rgba(42, 120, 214, 0.1)'
-const LIMITE = css.getPropertyValue('--nivel-atencao').trim() || '#d97706'
+const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
+const SERIE = token('--serie-1', '#1f6890')
+const LIMITE = token('--ideal-line', '#3a8a5c')
+const FAIXA = token('--ideal-wash', '#d9efe1')
+const GRADE = token('--line-soft', '#ddd6c7')
+const TEXTO = token('--muted', '#4a5f70')
+const NOITE = token('--night', '#0f3550')
+const FONTE = token('--font', 'sans-serif')
 
 const meta = computed(() => METRIC_META[props.metric])
 
@@ -60,13 +65,15 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
     {
       label: meta.value.label,
       data: points.map((point) => point.v),
-      borderWidth: 2.5,
+      // Linha grossa e sem área embaixo: no projetor, área clara some e
+      // linha fina falha.
+      borderWidth: 2.8,
       borderColor: SERIE,
-      backgroundColor: SERIE_WASH,
+      backgroundColor: SERIE,
       pointRadius: points.length > 120 ? 0 : 2,
-      pointHoverRadius: 4,
+      pointHoverRadius: 5,
       tension: 0.25,
-      fill: true,
+      fill: false,
     },
   ]
 
@@ -74,8 +81,8 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
     datasets.push({
       label: 'Limite mínimo',
       data: points.map(() => safeMin.value as number),
-      borderWidth: 1,
-      borderDash: [6, 5],
+      borderWidth: 2,
+      borderDash: [7, 6],
       borderColor: LIMITE,
       pointRadius: 0,
       fill: false,
@@ -83,14 +90,17 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
   }
 
   if (safeMax.value !== undefined) {
+    // Com os dois limites, o espaço entre eles fica sombreado: é a faixa ideal.
+    const temMinimo = safeMin.value !== undefined
     datasets.push({
       label: 'Limite máximo',
       data: points.map(() => safeMax.value as number),
-      borderWidth: 1,
-      borderDash: [6, 5],
+      borderWidth: 2,
+      borderDash: [7, 6],
       borderColor: LIMITE,
+      backgroundColor: FAIXA,
       pointRadius: 0,
-      fill: false,
+      fill: temMinimo ? '-1' : false,
     })
   }
 
@@ -115,6 +125,11 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       display: false,
     },
     tooltip: {
+      backgroundColor: NOITE,
+      cornerRadius: 8,
+      padding: 10,
+      titleFont: { family: FONTE, weight: 800 },
+      bodyFont: { family: FONTE, weight: 600 },
       callbacks: {
         label: (context) => {
           const value = context.parsed.y
@@ -140,14 +155,18 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
       ticks: {
         maxTicksLimit: 8,
+        color: TEXTO,
+        font: { family: FONTE, size: 12, weight: 700 },
       },
     },
     y: {
       beginAtZero: false,
       grid: {
-        color: 'rgba(15, 23, 42, 0.07)',
+        color: GRADE,
       },
       ticks: {
+        color: TEXTO,
+        font: { family: FONTE, size: 12, weight: 700 },
         callback: (value) => `${Number(value).toLocaleString('pt-BR')} ${meta.value.unit}`,
       },
     },
