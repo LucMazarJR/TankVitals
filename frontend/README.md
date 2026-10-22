@@ -85,6 +85,13 @@ marca. A apresentação é num projetor fraco, então o visual segue três regra
 | `src/components/TankDiagram.vue` | o tanque em corte, movido pelo nível e pelos atuadores ao vivo |
 | `src/components/MetricCard.vue` | o cartão de leitura com a régua da faixa ideal |
 
+**Contraste:** há dois modos, padrão e alto, que cada pessoa escolhe no menu
+do usuário (rodapé do menu lateral). O alto vale para tela com pouco brilho,
+como o projetor da apresentação. Cada token tem um valor por modo em
+`src/style.css`: token novo vai nos dois blocos. Preferência nova de exibição
+entra em `src/composables/usePreferences.ts` e ganha uma seção no
+`UserMenu.vue`.
+
 **Para uma tela nova:** monte com `.panel` e um `.panel-header` (título em
 `h3`), e pegue as cores dos tokens, nunca em hex solto. O tanque recebe tudo
 por props (`level`, `aerator`, `recirculation`, `refill`), e `null` quer
