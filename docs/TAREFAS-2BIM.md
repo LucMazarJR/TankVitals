@@ -214,6 +214,8 @@ flowchart TB
 
   *Pronto:* o botão liga a reposição, o estado muda quando a telemetria confirma e o nível sobe.
 
+  *Já existe no front:* `frontend/src/components/ActuatorControl.vue` (estado, botão, "aguardando confirmação", erro e esconder do visualizador), usado no dashboard. Falta o painel do simulador.
+
 - [ ] **IOT-06 · Bomba com o modelo físico** — depende da IA-01\
   A IA treina com dados gerados por um modelo físico da bomba. Se o simulador
   usar outra física, o modelo treinado não reconhece a bomba ao vivo.
@@ -351,7 +353,7 @@ flowchart TB
 
 ## WEB — Interface e 3D
 
-- [ ] **WEB-01 · Casca do app** — prioridade, porque as outras frentes penduram as telas aqui\
+- [x] **WEB-01 · Casca do app** — prioridade, porque as outras frentes penduram as telas aqui\
   É a estrutura da aplicação, onde todas as telas entram. Sai cedo para
   ninguém ficar esperando.
   - `vue-router` com as páginas Dashboard, 3D, Dispositivos, Mensageria, Laboratório, Treinamento, Insights, Assistente, Auditoria e Ferramentas, ainda vazias.
@@ -362,7 +364,7 @@ flowchart TB
 
   *Pronto:* o visualizador não vê a Auditoria nem os botões, e recarregar a página mantém a sessão.
 
-- [ ] **WEB-02 · Dashboard**\
+- [x] **WEB-02 · Dashboard**\
   É a tela principal, atualizada ao vivo pelo WebSocket.
   - Cards com o valor atual e a cor da faixa de cada sensor e das 4 variáveis da bomba.
   - Gráficos com o histórico e a faixa normal desenhada, com troca de período.
