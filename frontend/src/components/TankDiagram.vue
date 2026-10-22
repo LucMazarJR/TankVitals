@@ -217,7 +217,7 @@ const BUBBLES = [
 
 .tank-head strong {
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .tank-head span {
@@ -270,7 +270,7 @@ const BUBBLES = [
 .tank-empty {
   fill: var(--muted);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .tank-plant {
@@ -383,7 +383,7 @@ const BUBBLES = [
 .tank-tick-label {
   fill: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
 }
 
 .tank-marker {
@@ -399,7 +399,7 @@ const BUBBLES = [
 .tank-level-text {
   fill: var(--ink);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .tank-states {
@@ -417,10 +417,10 @@ const BUBBLES = [
   gap: 7px;
   min-height: 32px;
   padding: 0 11px;
-  border: 1.5px solid transparent;
+  border: var(--bw) solid transparent;
   border-radius: 999px;
   font-size: 0.8125rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .tank-state-dot {

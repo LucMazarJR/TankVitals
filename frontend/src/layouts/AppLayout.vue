@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { LogOut, Menu, X } from 'lucide-vue-next'
+import { Menu, X } from 'lucide-vue-next'
 import BrandMark from '../components/BrandMark.vue'
+import UserMenu from '../components/UserMenu.vue'
 import { MOCK } from '../config'
 import { LIVE_STATUS_LABEL } from '../live/socket'
 import { MENU_GROUPS, PAGES } from '../router/pages'
-import { ROLE_LABEL, useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores/auth'
 import { useLiveStore } from '../stores/live'
 
 const auth = useAuthStore()
@@ -24,7 +25,6 @@ const groups = computed(() =>
   })).filter((entry) => entry.pages.length > 0),
 )
 
-const roleLabel = computed(() => (auth.role ? ROLE_LABEL[auth.role] : ''))
 
 // No celular o menu vira gaveta; trocar de tela fecha a gaveta.
 watch(
@@ -85,20 +85,11 @@ onUnmounted(() => live.disconnect())
           {{ LIVE_STATUS_LABEL[live.status] }}
         </div>
 
-        <div class="user">
-          <div class="user-info">
-            <strong>{{ auth.username }}</strong>
-            <span>{{ roleLabel }}</span>
-          </div>
-          <button type="button" class="logout" @click="auth.logout()">
-            <LogOut :size="16" aria-hidden="true" />
-            Sair
-          </button>
-        </div>
-
         <p v-if="MOCK" class="mock-note">
           Modo simulado: o login e os dados ao vivo são gerados no navegador.
         </p>
+
+        <UserMenu />
       </div>
     </aside>
 
@@ -153,7 +144,7 @@ onUnmounted(() => live.disconnect())
 
 .brand strong {
   font-size: 1.1875rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -169,7 +160,7 @@ onUnmounted(() => live.disconnect())
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1.5px solid var(--night-line);
+  border: var(--bw) solid var(--night-line);
   border-radius: var(--radius-sm);
   color: #ffffff;
   background: transparent;
@@ -192,7 +183,7 @@ onUnmounted(() => live.disconnect())
   padding: 0 10px 4px;
   color: var(--night-muted);
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .nav-link {
@@ -218,7 +209,7 @@ onUnmounted(() => live.disconnect())
 
 .nav-link.active {
   color: #ffffff;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
   background: var(--night-active);
 }
 
@@ -236,7 +227,7 @@ onUnmounted(() => live.disconnect())
   flex-direction: column;
   gap: 12px;
   padding: 14px 8px 0;
-  border-top: 1.5px solid var(--night-line);
+  border-top: var(--bw) solid var(--night-line);
 }
 
 .live-state {
@@ -245,7 +236,7 @@ onUnmounted(() => live.disconnect())
   gap: 8px;
   color: var(--night-muted);
   font-size: 0.8125rem;
-  font-weight: 800;
+  font-weight: var(--fw-heavy);
 }
 
 .live-state-dot {
@@ -272,54 +263,10 @@ onUnmounted(() => live.disconnect())
   background: var(--nivel-atencao);
 }
 
-.user {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.user-info {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  line-height: 1.25;
-}
-
-.user-info strong {
-  overflow: hidden;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-info span {
-  color: var(--night-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.logout {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1.5px solid var(--night-muted);
-  border-radius: var(--radius-sm);
-  color: #ffffff;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  background: transparent;
-}
-
-.logout:hover {
-  background: var(--night-2);
-}
 
 .mock-note {
   padding: 8px 10px;
-  border: 1.5px dashed var(--night-line);
+  border: var(--bw) dashed var(--night-line);
   border-radius: var(--radius-sm);
   color: var(--night-muted);
   font-size: 0.75rem;

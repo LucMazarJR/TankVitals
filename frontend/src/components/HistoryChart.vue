@@ -17,6 +17,7 @@ import type { ChartData, ChartOptions } from 'chart.js'
 import type { HistorySeries, MetricKey, MetricThreshold } from '../types'
 import { METRIC_META } from '../types'
 import { UI_ICON } from '../icons'
+import { usePreferences } from '../composables/usePreferences'
 
 ChartJS.register(
   CategoryScale,
@@ -36,16 +37,23 @@ const props = defineProps<{
   range: string
 }>()
 
-// Lidos do CSS para não duplicar hex entre folha de estilo e componente.
-const css = getComputedStyle(document.documentElement)
-const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
-const SERIE = token('--serie-1', '#1f6890')
-const LIMITE = token('--ideal-line', '#3a8a5c')
-const FAIXA = token('--ideal-wash', '#d9efe1')
-const GRADE = token('--line-soft', '#ddd6c7')
-const TEXTO = token('--muted', '#4a5f70')
-const NOITE = token('--night', '#0f3550')
-const FONTE = token('--font', 'sans-serif')
+// Lidos do CSS na hora de desenhar, e lidos de novo quando o contraste muda:
+// os tokens são outros em cada modo.
+const preferences = usePreferences()
+const palette = computed(() => {
+  void preferences.contrast
+  const css = getComputedStyle(document.documentElement)
+  const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
+  return {
+    serie: token('--serie-1', '#2a7299'),
+    limite: token('--ideal-line', '#4b9568'),
+    faixa: token('--ideal-wash', '#e3f2e8'),
+    grade: token('--line-soft', '#e7e1d5'),
+    texto: token('--muted', '#576c7c'),
+    noite: token('--night', '#163d5a'),
+    fonte: token('--font', 'sans-serif'),
+  }
+})
 
 const meta = computed(() => METRIC_META[props.metric])
 
@@ -68,8 +76,8 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       // Linha grossa e sem área embaixo: no projetor, área clara some e
       // linha fina falha.
       borderWidth: 2.8,
-      borderColor: SERIE,
-      backgroundColor: SERIE,
+      borderColor: palette.value.serie,
+      backgroundColor: palette.value.serie,
       pointRadius: points.length > 120 ? 0 : 2,
       pointHoverRadius: 5,
       tension: 0.25,
@@ -83,7 +91,7 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       data: points.map(() => safeMin.value as number),
       borderWidth: 2,
       borderDash: [7, 6],
-      borderColor: LIMITE,
+      borderColor: palette.value.limite,
       pointRadius: 0,
       fill: false,
     })
@@ -97,8 +105,8 @@ const chartData = computed<ChartData<'line', number[], Date>>(() => {
       data: points.map(() => safeMax.value as number),
       borderWidth: 2,
       borderDash: [7, 6],
-      borderColor: LIMITE,
-      backgroundColor: FAIXA,
+      borderColor: palette.value.limite,
+      backgroundColor: palette.value.faixa,
       pointRadius: 0,
       fill: temMinimo ? '-1' : false,
     })
@@ -125,11 +133,11 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       display: false,
     },
     tooltip: {
-      backgroundColor: NOITE,
+      backgroundColor: palette.value.noite,
       cornerRadius: 8,
       padding: 10,
-      titleFont: { family: FONTE, weight: 800 },
-      bodyFont: { family: FONTE, weight: 600 },
+      titleFont: { family: palette.value.fonte, weight: 800 },
+      bodyFont: { family: palette.value.fonte, weight: 600 },
       callbacks: {
         label: (context) => {
           const value = context.parsed.y
@@ -155,18 +163,18 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
       ticks: {
         maxTicksLimit: 8,
-        color: TEXTO,
-        font: { family: FONTE, size: 12, weight: 700 },
+        color: palette.value.texto,
+        font: { family: palette.value.fonte, size: 12, weight: 700 },
       },
     },
     y: {
       beginAtZero: false,
       grid: {
-        color: GRADE,
+        color: palette.value.grade,
       },
       ticks: {
-        color: TEXTO,
-        font: { family: FONTE, size: 12, weight: 700 },
+        color: palette.value.texto,
+        font: { family: palette.value.fonte, size: 12, weight: 700 },
         callback: (value) => `${Number(value).toLocaleString('pt-BR')} ${meta.value.unit}`,
       },
     },

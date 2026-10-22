@@ -6,6 +6,8 @@ import '@fontsource/nunito-sans/600.css'
 import '@fontsource/nunito-sans/700.css'
 import '@fontsource/nunito-sans/800.css'
 import './style.css'
+// Aplica o contraste guardado antes de montar, para a tela não piscar.
+import './composables/usePreferences'
 import App from './App.vue'
 import router from './router'
 
