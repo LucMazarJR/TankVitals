@@ -154,10 +154,7 @@ onMounted(() => {
       </div>
 
       <section class="dashboard-toolbar">
-        <div>
-          <span class="eyebrow">VISÃO GERAL</span>
-          <h2>Qualidade da água</h2>
-        </div>
+        <h2>Qualidade da água</h2>
 
         <div class="toolbar-controls">
           <label v-if="tanks.length" class="select-field">
@@ -197,10 +194,7 @@ onMounted(() => {
 
       <section class="panel chart-panel">
         <div class="panel-header">
-          <div>
-            <span class="eyebrow">HISTÓRICO</span>
-            <h3>Evolução das leituras</h3>
-          </div>
+          <h3>Evolução das leituras</h3>
 
           <!-- Só a grandeza fica aqui: ela escopa apenas este gráfico.
                O período subiu para a barra de cima, porque filtra vários painéis. -->
@@ -257,10 +251,7 @@ onMounted(() => {
 
       <section class="panel">
         <div class="panel-header compact">
-          <div>
-            <span class="eyebrow">ANÁLISE</span>
-            <h3>Comportamento no período</h3>
-          </div>
+          <h3>Comportamento no período</h3>
           <span v-if="atualizadoLabel" class="small-note live-note">
             <component :is="UI_ICON.atualizando" :size="13" aria-hidden="true" />
             atualizado às {{ atualizadoLabel }}
@@ -278,10 +269,7 @@ onMounted(() => {
       <section class="lower-grid">
         <div class="panel">
           <div class="panel-header compact">
-            <div>
-              <span class="eyebrow">DADOS</span>
-              <h3>Últimas leituras</h3>
-            </div>
+            <h3>Últimas leituras</h3>
             <span class="small-note">máximo de 50 registros</span>
           </div>
           <HistoryTable :history="history" :metric="selectedMetric" :threshold="currentThreshold" />
@@ -289,10 +277,7 @@ onMounted(() => {
 
         <div class="panel">
           <div class="panel-header compact">
-            <div>
-              <span class="eyebrow">MONITORAMENTO</span>
-              <h3>Alertas do período</h3>
-            </div>
+            <h3>Alertas do período</h3>
             <span class="alert-count">
               {{ history?.series.length ? 'Atualizado' : '—' }}
             </span>
@@ -302,8 +287,8 @@ onMounted(() => {
       </section>
 
       <footer class="footer">
-        <span>TankVitals • IoT para monitoramento de aquicultura</span>
-        <span>Vue 3 + TypeScript + Chart.js + Lucide</span>
+        <span>TankVitals · monitoramento de aquicultura</span>
+        <span>{{ tankId }}</span>
       </footer>
     </main>
 

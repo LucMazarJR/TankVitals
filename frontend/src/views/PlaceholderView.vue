@@ -14,7 +14,6 @@ const page = computed(() => route.meta.page)
   <main v-if="page" class="dashboard">
     <header class="page-header">
       <div>
-        <span class="eyebrow">{{ page.group.toUpperCase() }}</span>
         <h2>{{ page.title }}</h2>
         <p v-if="page.description">{{ page.description }}</p>
       </div>
@@ -39,10 +38,7 @@ const page = computed(() => route.meta.page)
 
     <section class="panel">
       <div class="panel-header compact">
-        <div>
-          <span class="eyebrow">STORE AO VIVO</span>
-          <h3>O que já está chegando</h3>
-        </div>
+        <h3>O que já está chegando pelo store ao vivo</h3>
       </div>
       <LiveSnapshot />
     </section>
