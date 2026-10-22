@@ -48,7 +48,7 @@ onUnmounted(() => live.disconnect())
           <BrandMark :size="38" />
           <span>
             <strong>TankVitals</strong>
-            <small>Tanque e bomba ao vivo</small>
+            <small>aquicultura ao vivo</small>
           </span>
         </RouterLink>
 
@@ -73,7 +73,7 @@ onUnmounted(() => live.disconnect())
             class="nav-link"
             active-class="active"
           >
-            <component :is="page.icon" :size="17" aria-hidden="true" />
+            <component :is="page.icon" :size="18" aria-hidden="true" />
             {{ page.title }}
           </RouterLink>
         </div>
@@ -88,7 +88,7 @@ onUnmounted(() => live.disconnect())
         <div class="user">
           <div class="user-info">
             <strong>{{ auth.username }}</strong>
-            <span class="role-chip">{{ roleLabel }}</span>
+            <span>{{ roleLabel }}</span>
           </div>
           <button type="button" class="logout" @click="auth.logout()">
             <LogOut :size="16" aria-hidden="true" />
@@ -109,9 +109,11 @@ onUnmounted(() => live.disconnect())
 </template>
 
 <style scoped>
+/* O menu é a água funda do app: azul-marinho, com a cor do peixe só na marca
+   e no ícone da tela aberta. */
 .layout {
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-columns: 244px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -120,12 +122,12 @@ onUnmounted(() => live.disconnect())
   top: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
   height: 100vh;
-  padding: 20px 14px 16px;
+  padding: 18px 12px 16px;
   overflow-y: auto;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  color: var(--night-ink);
+  background: var(--night);
 }
 
 .sidebar-top {
@@ -137,9 +139,10 @@ onUnmounted(() => live.disconnect())
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 6px;
-  color: inherit;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  color: #ffffff;
   text-decoration: none;
 }
 
@@ -149,24 +152,27 @@ onUnmounted(() => live.disconnect())
 }
 
 .brand strong {
-  font-size: 0.98rem;
-  letter-spacing: -0.02em;
+  font-size: 1.1875rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .brand small {
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--night-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .menu-toggle {
   display: none;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  color: var(--ink);
-  background: var(--surface);
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--night-line);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  background: transparent;
 }
 
 .nav {
@@ -183,84 +189,86 @@ onUnmounted(() => live.disconnect())
 }
 
 .nav-group-title {
-  padding: 0 10px 5px;
-  color: var(--muted);
-  font-size: 0.66rem;
+  padding: 0 10px 4px;
+  color: var(--night-muted);
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 9px;
-  color: var(--ink);
-  font-size: 0.9rem;
-  font-weight: 550;
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--night-ink);
+  font-weight: 600;
   text-decoration: none;
 }
 
 .nav-link svg {
   flex: 0 0 auto;
-  color: var(--muted);
+  color: var(--night-muted);
 }
 
 .nav-link:hover {
-  background: var(--background);
+  background: var(--night-2);
 }
 
 .nav-link.active {
-  color: var(--nivel-ok);
-  font-weight: 700;
-  background: rgba(21, 127, 120, 0.1);
+  color: #ffffff;
+  font-weight: 800;
+  background: var(--night-active);
 }
 
 .nav-link.active svg {
-  color: currentColor;
+  color: var(--brand-fish);
+}
+
+.nav-link:focus-visible {
+  outline-color: var(--brand-fish);
+  outline-offset: -3px;
 }
 
 .sidebar-footer {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  padding: 14px 8px 0;
+  border-top: 1.5px solid var(--night-line);
 }
 
 .live-state {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 6px;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 650;
+  color: var(--night-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
 }
 
 .live-state-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--night-muted);
   border-radius: 50%;
-  background: #9aa6af;
 }
 
-.live-live {
-  color: var(--nivel-ok);
+.live-live,
+.live-simulated {
+  color: #a6ebc2;
 }
 
-.live-live .live-state-dot {
-  background: var(--nivel-ok);
-}
-
+.live-live .live-state-dot,
 .live-simulated .live-state-dot {
-  background: var(--serie-1);
+  border: 0;
+  background: #5acb8b;
 }
 
 .live-connecting .live-state-dot,
 .live-reconnecting .live-state-dot {
+  border: 0;
   background: var(--nivel-atencao);
 }
 
@@ -269,58 +277,53 @@ onUnmounted(() => live.disconnect())
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 6px;
 }
 
 .user-info {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  line-height: 1.25;
 }
 
 .user-info strong {
   overflow: hidden;
-  font-size: 0.88rem;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.role-chip {
-  align-self: flex-start;
-  padding: 1px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: var(--background);
+.user-info span {
+  color: var(--night-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .logout {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--ink);
-  font-size: 0.8rem;
-  font-weight: 650;
-  background: var(--surface);
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--night-muted);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  background: transparent;
 }
 
 .logout:hover {
-  background: var(--background);
+  background: var(--night-2);
 }
 
 .mock-note {
   padding: 8px 10px;
-  border-radius: 9px;
-  color: #1f5fae;
-  font-size: 0.72rem;
+  border: 1.5px dashed var(--night-line);
+  border-radius: var(--radius-sm);
+  color: var(--night-muted);
+  font-size: 0.75rem;
   line-height: 1.4;
-  background: rgba(42, 120, 214, 0.08);
 }
 
 .content {
@@ -331,7 +334,7 @@ onUnmounted(() => live.disconnect())
   .layout {
     grid-template-columns: 1fr;
     /* Altura da barra do topo, para a barra de status do dashboard grudar logo abaixo. */
-    --app-top-offset: 59px;
+    --app-top-offset: 64px;
   }
 
   .sidebar {
@@ -340,8 +343,6 @@ onUnmounted(() => live.disconnect())
     height: auto;
     max-height: 100vh;
     padding: 10px 14px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
   }
 
   .menu-toggle {
@@ -360,6 +361,10 @@ onUnmounted(() => live.disconnect())
 
   .menu-open .nav {
     margin: 16px 0;
+  }
+
+  .menu-open .sidebar-footer {
+    padding-bottom: 6px;
   }
 }
 </style>
