@@ -41,8 +41,8 @@ export const LEVEL_TEXT: Record<AlertLevel, string> = {
 }
 
 /** Texto da faixa ideal mostrado no card, a partir dos limites da API. */
-export function safeRangeLabel(threshold: MetricThreshold | undefined, unit: string): string {
-  if (!threshold) return 'faixa segura não disponível'
+export function safeRangeLabel(threshold: MetricThreshold | null | undefined, unit: string): string {
+  if (!threshold) return 'sem faixa definida'
 
   const { ok_min, ok_max } = threshold
   const n = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })

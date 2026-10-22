@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import RoleGate from './RoleGate.vue'
 import { useActuatorCommand } from '../composables/useActuatorCommand'
-import type { Device } from '../domain/devices'
+import type { Device, SeriesStats } from '../domain/devices'
 
 /**
  * Uma linha de atuador (IOT-05): estado ao vivo, quem manda nele e o botão de
@@ -10,8 +10,8 @@ import type { Device } from '../domain/devices'
  */
 const props = defineProps<{
   device: Device
-  /** Quantas vezes ligou no período, do histórico; `undefined` esconde. */
-  turnOns?: number
+  /** Estatística do campo de estado no período (do histórico); sem ela, esconde o resumo. */
+  stats?: SeriesStats
   /** "na última hora", "nas últimas 6 horas"... */
   periodLabel?: string
 }>()
@@ -27,10 +27,17 @@ const stateText = computed(() => ({ on: 'Ligado', off: 'Desligado', unknown: 'Se
 
 const controlText = computed(() => (props.device.control === 'rule' ? 'Automático, pela regra' : 'Manual'))
 
-const turnOnsText = computed(() => {
-  if (props.turnOns === undefined) return ''
-  const times = props.turnOns === 1 ? 'vez' : 'vezes'
-  return `ligou ${props.turnOns.toLocaleString('pt-BR')} ${times}${props.periodLabel ? ` ${props.periodLabel}` : ''}`
+// "ligou 6 vezes", "ligado o período todo" ou "não ligou": o que ajuda a
+// entender o uso, em vez de um "ligou 0 vezes" para o que nunca desligou.
+const usageText = computed(() => {
+  const stats = props.stats
+  if (!stats || stats.turn_ons === undefined || !stats.count) return ''
+  const period = props.periodLabel ? ` ${props.periodLabel}` : ''
+  const onShare = (stats.on_s ?? 0) / stats.count
+  if (stats.turn_ons === 0 && onShare > 0.99) return `ligado o período todo`
+  if (stats.turn_ons === 0 && onShare < 0.01) return `não ligou${period}`
+  const times = stats.turn_ons === 1 ? 'vez' : 'vezes'
+  return `ligou ${stats.turn_ons.toLocaleString('pt-BR')} ${times}${period}`
 })
 
 const actionLabel = computed(() => (current.value ? 'Desligar' : 'Ligar'))
@@ -41,7 +48,7 @@ const actionLabel = computed(() => (current.value ? 'Desligar' : 'Ligar'))
     <div class="actuator-info">
       <strong>{{ device.name }}</strong>
       <span class="actuator-meta">
-        {{ controlText }}<template v-if="turnOnsText"> · {{ turnOnsText }}</template>
+        {{ controlText }}<template v-if="usageText"> · {{ usageText }}</template>
       </span>
       <span v-if="pending" class="actuator-pending" role="status">Aguardando confirmação do dispositivo…</span>
       <span v-else-if="error" class="actuator-error" role="alert">{{ error }}</span>

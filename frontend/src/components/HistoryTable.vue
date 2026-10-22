@@ -1,45 +1,43 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { HistorySeries, MetricKey, MetricThreshold } from '../types'
-import { METRIC_META } from '../types'
-import { classifyMetric, LEVEL_TEXT } from '../alerts'
+import type { HistoryPoint, MetricThreshold } from '../types'
+import { classify, LEVEL_TEXT } from '../alerts'
 
+// As leituras cruas mais recentes de uma variável (do store ao vivo), da mais
+// nova para a mais velha.
 const props = defineProps<{
-  history: HistorySeries | null
-  metric: MetricKey
-  threshold?: MetricThreshold
+  readings: HistoryPoint[]
+  label: string
+  unit: string
+  decimals: number
+  threshold?: MetricThreshold | null
 }>()
 
-const rows = computed(() => {
-  const series = props.history?.series.find((item) => item.metric === props.metric)
-  if (!series) return []
-
-  return [...series.points]
-    .sort((a, b) => +new Date(b.t) - +new Date(a.t))
-    .slice(0, 50)
-    .map((point) => ({
-      time: new Date(point.t),
-      value: point.v,
-    }))
-})
+const rows = computed(() =>
+  props.readings.slice(0, 50).map((point) => ({
+    key: point.t,
+    time: new Date(point.t),
+    value: point.v,
+    level: classify(point.v, props.threshold),
+  })),
+)
 
 function formatDate(date: Date): string {
   return date.toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
   })
 }
 
-function levelFor(value: number) {
-  return classifyMetric(props.metric, value, props.threshold)
+function formatValue(value: number): string {
+  return value.toLocaleString('pt-BR', {
+    minimumFractionDigits: props.decimals,
+    maximumFractionDigits: props.decimals,
+  })
 }
-
-const meta = computed(() => METRIC_META[props.metric])
-
 </script>
 
 <template>
@@ -48,29 +46,22 @@ const meta = computed(() => METRIC_META[props.metric])
       <thead>
         <tr>
           <th>Data e hora</th>
-          <th>{{ meta.label }}</th>
+          <th>{{ label }}</th>
           <th>Unidade</th>
           <th>Estado</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in rows" :key="row.time.toISOString()">
+        <tr v-for="row in rows" :key="row.key">
           <td>{{ formatDate(row.time) }}</td>
-          <td class="value-cell">
-            {{ row.value.toLocaleString('pt-BR', {
-              minimumFractionDigits: meta.decimals,
-              maximumFractionDigits: meta.decimals
-            }) }}
-          </td>
-          <td>{{ meta.unit }}</td>
+          <td class="value-cell">{{ formatValue(row.value) }}</td>
+          <td>{{ unit }}</td>
           <td>
-            <span :class="['table-level', `badge-${levelFor(row.value)}`]">
-              {{ LEVEL_TEXT[levelFor(row.value)] }}
-            </span>
+            <span :class="['table-level', `badge-${row.level}`]">{{ LEVEL_TEXT[row.level] }}</span>
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="4" class="table-empty">Nenhuma leitura no período selecionado.</td>
+          <td colspan="4" class="table-empty">Nenhuma leitura chegou ainda.</td>
         </tr>
       </tbody>
     </table>

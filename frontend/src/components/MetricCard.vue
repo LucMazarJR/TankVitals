@@ -9,12 +9,16 @@ const props = defineProps<{
   icon: Component
   label: string
   metric: MetricValue | undefined
-  threshold?: MetricThreshold
+  threshold?: MetricThreshold | null
+  /** Casas decimais do cadastro; sem ela, 2 para pH e 1 para o resto. */
+  decimals?: number
+  /** Unidade do cadastro, para a faixa aparecer certa mesmo sem leitura. */
+  unit?: string
 }>()
 
 const valueLabel = computed(() => {
   if (!props.metric || props.metric.value === null || Number.isNaN(props.metric.value)) return '—'
-  const decimals = props.metric.unit === 'pH' ? 2 : 1
+  const decimals = props.decimals ?? (props.metric.unit === 'pH' ? 2 : 1)
   return props.metric.value.toLocaleString('pt-BR', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
@@ -22,7 +26,7 @@ const valueLabel = computed(() => {
 })
 
 // A unidade vem da leitura; se ela ainda nao chegou, o card mostra so o valor.
-const safeRange = computed(() => safeRangeLabel(props.threshold, props.metric?.unit ?? ''))
+const safeRange = computed(() => safeRangeLabel(props.threshold, props.unit ?? props.metric?.unit ?? ''))
 
 /**
  * Régua da faixa: a trilha vai um pouco além dos limites críticos, a banda
@@ -62,11 +66,11 @@ const scale = computed(() => {
     <div class="metric-head">
       <span class="metric-icon"><component :is="icon" :size="19" aria-hidden="true" /></span>
       <span class="metric-label">{{ label }}</span>
-      <span v-if="metric" :class="['level-badge', `badge-${metric.level}`]">
+      <span v-if="metric && threshold" :class="['level-badge', `badge-${metric.level}`]">
         <component :is="LEVEL_ICON[metric.level]" :size="13" aria-hidden="true" />
         {{ LEVEL_TEXT[metric.level] }}
       </span>
-      <span v-else class="level-badge badge-vazio">
+      <span v-else-if="!metric" class="level-badge badge-vazio">
         <component :is="UI_ICON.semDado" :size="13" aria-hidden="true" />
         Sem dado
       </span>
