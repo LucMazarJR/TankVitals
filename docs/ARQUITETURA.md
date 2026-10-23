@@ -6,6 +6,11 @@ em [TAREFAS.md](TAREFAS.md) referencia uma seção daqui.
 Regra de ouro: **ninguém inventa nome de campo, tópico ou endpoint.** Se
 precisar mudar algo, muda aqui primeiro e avisa a equipe.
 
+> **2º bimestre:** as seções 1 a 10 descrevem o sistema do 1º bimestre (ESP32
+> no Wokwi, ingestor e API num processo só). Elas continuam valendo para o
+> código atual do `backend/` até a BACK-01. Os contratos do 2º bimestre começam
+> na **§11** e vão até a §17.
+
 ---
 
 ## 1. Visão geral do fluxo
@@ -426,3 +431,137 @@ Sequência de testes usada nas tarefas (executar nesta ordem):
 | Python → InfluxDB | Data Explorer em `http://localhost:8086` | pontos no measurement `water_reading` |
 | InfluxDB → API | `curl http://localhost:8000/api/readings/latest` | JSON do §6 |
 | API → Dashboard | navegador em `http://localhost:5173` | cards e gráfico atualizando |
+
+---
+
+## 11. Segundo bimestre: visão e estado deste contrato
+
+> **Estado:** proposta da PLAT-01, escrita a partir do que o frontend já usa no
+> modo simulado (`frontend/src/domain/`, `frontend/src/live/envelope.ts` e
+> `frontend/src/mock/`). Falta uma pessoa de cada frente revisar. Quem precisar
+> mudar um nome muda aqui primeiro e avisa o grupo, como diz a regra de ouro.
+
+O desenho e o papel de cada peça estão em
+[TAREFAS-2BIM.md › Arquitetura](TAREFAS-2BIM.md#arquitetura). Em resumo, uma
+leitura sai do simulador, passa pelo Mosquitto e pelo gateway e entra no
+RabbitMQ. De lá o writer grava no InfluxDB e a API empurra para o navegador
+pelo WebSocket. O comando faz o caminho inverso, e a IA lê a telemetria no
+RabbitMQ e devolve as previsões pelo mesmo barramento.
+
+O que muda em relação às seções 1 a 10:
+
+| 1º bimestre | 2º bimestre |
+| --- | --- |
+| o ESP32 publica um JSON por tanque | o simulador publica uma mensagem por dispositivo (§13) |
+| o ingestor grava direto no InfluxDB | o gateway passa para o RabbitMQ e o writer grava (§14) |
+| faixas fixas no `.env` (§5) | faixas no cadastro do PostgreSQL, editáveis pela tela (§15 e §16) |
+| API sem login | JWT com três papéis e WebSocket com ticket (§17) |
+| `/api/readings/*` por tanque | rotas por dispositivo e por variável (§17) |
+
+---
+
+## 12. Envelope único das mensagens
+
+Toda mensagem ao vivo usa o mesmo envelope no MQTT, no RabbitMQ e no
+WebSocket. Assim nenhum serviço traduz formato: cada um só lê o que precisa e
+repassa.
+
+```json
+{
+  "id": "0f6c1d0e-5b7a-4a43-9a52-7c3e2f1b9d10",
+  "ts": "2026-11-16T13:45:00Z",
+  "type": "telemetry",
+  "device": "od-01",
+  "payload": { "oxygen_mg_l": 6.82 }
+}
+```
+
+| Campo | Regra |
+| --- | --- |
+| `id` | único por mensagem (UUID). Quem recebe o mesmo id duas vezes descarta a segunda |
+| `ts` | quando a leitura ou o evento aconteceu, em ISO 8601 UTC, e não quando chegou |
+| `type` | `telemetry`, `command`, `insight`, `alert`, `job_progress`, `model_updated` ou `status` |
+| `device` | id do cadastro (§15). Quando a mensagem não é de um dispositivo, vai o nome da origem: `sim` no status do simulador e `worker` no progresso de job |
+| `payload` | objeto, com o formato que depende do `type` (exemplos abaixo) |
+
+O frontend confere essa forma antes de aceitar a mensagem (`isEnvelope`, em
+`frontend/src/live/envelope.ts`) e ignora o que não bater.
+
+### 12.1 Payload de cada tipo
+
+**`telemetry` de um sensor:** um campo por variável, com a chave do cadastro.
+
+```json
+{ "oxygen_mg_l": 6.82 }
+```
+
+**`telemetry` da bomba de recirculação:** as quatro variáveis e o estado.
+
+```json
+{ "vibration_mm_s": 1.12, "current_a": 2.61, "motor_temp_c": 47.3, "flow_l_min": 48.9, "running": true }
+```
+
+**`telemetry` de um atuador:** só o estado. É a confirmação de que o comando
+chegou (IOT-03); a tela só sai do "aguardando confirmação" quando ela chega.
+
+```json
+{ "on": true }
+```
+
+**`command`:** o que a API, ou o serviço `rules`, manda para o dispositivo. Os
+modos de `inject_fault` são `rolamento`, `entupimento`, `superaquecimento` e
+`desbalanceamento` (IOT-08).
+
+```json
+{ "command": "on", "value": true, "origin": "web", "user": "operador" }
+{ "command": "inject_fault", "value": "rolamento", "origin": "web", "user": "operador" }
+{ "command": "repair", "origin": "web", "user": "operador" }
+{ "command": "on", "value": false, "origin": "regra", "user": null }
+```
+
+**`insight`:** a previsão da IA para um equipamento (IA-07). A vida útil
+(`rul_h`) tem teto de 168 h, e no teto ela quer dizer "nenhuma falha à vista".
+
+```json
+{ "health": 72.5, "rul_h": 41.0, "model_version": "v3" }
+```
+
+**`alert`:** o alerta inteiro, igual a um item de `GET /api/alerts`, mandado
+quando ele abre, quando piora e quando fecha. O `level` é `atencao` ou
+`critico`. Nos alertas da IA, que vêm da previsão e não de uma faixa, `field` e
+`value` são `null`.
+
+```json
+{
+  "id": "a-118", "device": "bomba-rec-01", "field": "vibration_mm_s", "level": "critico",
+  "message": "Vibração em nível crítico", "value": 4.71,
+  "opened_at": "2026-11-16T13:40:00Z", "closed_at": null
+}
+```
+
+**`job_progress`:** o andamento de um job do worker (IA-03 e IA-05). O
+`status` é `queued`, `running`, `done` ou `failed`, e o `progress` vai de 0
+a 1. *A IA confirma este formato.*
+
+```json
+{ "job_id": "j-42", "kind": "datagen", "status": "running", "progress": 0.35, "message": "dia 12 de 30" }
+```
+
+**`model_updated`:** um modelo novo entrou em uso (IA-05). A inferência
+recarrega sem reiniciar, e a tela Treinamento destaca a versão nova.
+
+```json
+{ "model": "health", "version": "v4" }
+```
+
+**`status`:** o simulador entrou ou caiu (o Last Will da §13).
+
+```json
+{ "online": false }
+```
+
+### 12.2 O que nunca vai na telemetria
+
+O rótulo da simulação (horas até a falha, saúde de verdade e modo de falha) só
+existe nos dados do gerador da IA. Se ele aparecer na telemetria, o modelo
+"cola" na prova ao vivo. A IOT-08 tem um teste automatizado conferindo isso.
