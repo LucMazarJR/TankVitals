@@ -53,3 +53,38 @@ export function healthLevel(health: number, rulHours: number | null): AlertLevel
   if (health < 70) return 'atencao'
   return 'ok'
 }
+
+/**
+ * Régua da faixa: a trilha vai um pouco além dos limites críticos, a banda
+ * verde é a faixa ideal e o traço é a leitura atual, em % da largura. Em % a
+ * régua vai sempre de 0 a 100. Sem os dois limites não há como montar a
+ * escala, e a régua some (`null`).
+ */
+export function rangeScale(
+  threshold: MetricThreshold | null | undefined,
+  value: number | null | undefined,
+  unit: string,
+): { left: string; width: string; at: string } | null {
+  if (!threshold || value === undefined || value === null || Number.isNaN(value)) return null
+
+  let min: number
+  let max: number
+  const lo = threshold.crit_min ?? threshold.ok_min
+  const hi = threshold.crit_max ?? threshold.ok_max
+  if (unit === '%') {
+    min = 0
+    max = 100
+  } else if (lo !== null && hi !== null && hi > lo) {
+    const pad = (hi - lo) * 0.25
+    // Grandeza física que não fica negativa (turbidez) não ganha trilha abaixo de 0.
+    min = lo >= 0 ? Math.max(0, lo - pad) : lo - pad
+    max = hi + pad
+  } else {
+    return null
+  }
+
+  const pos = (x: number) => ((Math.min(max, Math.max(min, x)) - min) / (max - min)) * 100
+  const from = pos(threshold.ok_min ?? min)
+  const to = pos(threshold.ok_max ?? max)
+  return { left: `${from}%`, width: `${to - from}%`, at: `${pos(value)}%` }
+}

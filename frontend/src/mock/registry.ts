@@ -202,12 +202,34 @@ export const SEED_RULES: Rule[] = [
   },
 ]
 
+const STORAGE_KEY = 'tankvitals.mock.registry'
+
+/** O que já foi mudado nesta aba, se houver. */
+function restore(): { devices: Device[]; rules: Rule[] } | null {
+  try {
+    const data = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? 'null')
+    return Array.isArray(data?.devices) && Array.isArray(data?.rules) ? data : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * O cadastro de agora no modo simulado: nasce do seed e muda pela tela
- * Dispositivos. Fica na memória da aba, como a planta: recarregar a página
- * volta ao seed.
+ * Dispositivos. Fica no `sessionStorage` da aba: recarregar a página mantém o
+ * que foi cadastrado (o "tanque-02" da demonstração não some no F5); fechar a
+ * aba volta ao seed.
  */
-export const mockRegistry = {
+export const mockRegistry = restore() ?? {
   devices: structuredClone(SEED_DEVICES),
   rules: structuredClone(SEED_RULES),
+}
+
+/** Chamado depois de cada mudança no cadastro ou numa regra. */
+export function saveMockRegistry(): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(mockRegistry))
+  } catch {
+    // Sem armazenamento (aba anônima, cota cheia), vale só até recarregar.
+  }
 }

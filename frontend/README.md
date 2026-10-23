@@ -39,6 +39,10 @@ histórico, os alertas e os comandos; a regra do aerador, a reposição, a
 recirculação e a falha injetada funcionam. Dá para testar o fluxo Web → IoT
 inteiro sem backend.
 
+O que se cadastra pela tela (dispositivos, regras) e o log da auditoria ficam
+no `sessionStorage` da aba: recarregar a página mantém, fechar a aba volta ao
+início.
+
 Quando o backend tiver as rotas do contrato abaixo, ponha `VITE_MOCK=false` no
 `.env`. Nenhum outro código muda.
 
@@ -51,18 +55,22 @@ Quando o backend tiver as rotas do contrato abaixo, ponha `VITE_MOCK=false` no
 | `src/stores/live.ts` | o store ao vivo: última telemetria de cada dispositivo, as recentes e os insights da IA |
 | `src/live/socket.ts` | o WebSocket: pede o ticket, conecta e reconecta |
 | `src/api/http.ts` | o cliente HTTP: manda o JWT e leva ao login quando a sessão acaba |
-| `src/mock/` | o login e a telemetria do modo simulado |
+| `src/mock/` | o login e a telemetria do modo simulado; o cadastro e a auditoria ficam no `sessionStorage` da aba |
 | `src/components/RoleGate.vue` | esconde um trecho de quem não tem a permissão |
 | `src/domain/devices.ts` | os tipos do cadastro, do histórico, dos alertas e dos comandos (o contrato) |
 | `src/stores/devices.ts` | o cadastro de dispositivos, carregado uma vez para todas as telas |
 | `src/api/devices.ts` | as rotas de cadastro, histórico, alertas e comando |
 | `src/composables/useLiveValues.ts` | o "agora" de cada dispositivo, com "sem dados" depois de 10 s |
 | `src/components/ActuatorControl.vue` | o controle de atuador: estado, botão e "aguardando confirmação" |
-| `src/plant/layout.ts` | onde cada dispositivo do cadastro entra no desenho (e no 3D) |
+| `src/plant/layout.ts` | o molde de um tanque: a posição de cada item pelo id e pelo papel, e os tubos |
+| `src/plant/roles.ts` | o papel de cada dispositivo (temperatura, pH, bomba de recirculação...), pelo prefixo do id |
+| `src/plant/tanks.ts` | os tanques do cadastro, um por zona: membros, posições, vínculos e tubos (`planTanks`) |
 | `src/domain/registry.ts` | as regras do cadastro (id, faixas, limites da regra), usadas pelo formulário e pelo modo simulado |
 | `src/composables/useDeviceState.ts` | a situação de cada dispositivo: online, parou ou sem dados, e o pior nível das faixas |
-| `src/views/DevicesView.vue` | a tela Dispositivos (WEB-03): lista ao vivo, formulário do admin e aba de regras |
-| `src/views/AuditView.vue` | a Auditoria (WEB-04), só admin: filtro por tipo e usuário, paginada |
+| `src/views/DevicesView.vue` | a tela Dispositivos (WEB-03): resumo, filtros, cartões por tanque, detalhe, formulário e regras |
+| `src/components/DeviceCard.vue` | o cartão de um dispositivo: leitura ao vivo, mini gráfico, régua e situação |
+| `src/components/DeviceDetail.vue` | o detalhe que abre pela direita, com editar e desativar para o admin |
+| `src/views/AuditView.vue` | a Auditoria (WEB-04), só admin: agrupada por dia, filtro por tipo e usuário, paginada |
 | `src/views/ToolsView.vue` | as Ferramentas (WEB-04): links do InfluxDB, RabbitMQ, pgAdmin e da documentação da API |
 | `src/mock/audit.ts` | a auditoria do modo simulado: 3 dias inventados e o que a pessoa faz no navegador |
 
@@ -159,46 +167,88 @@ vezes o aerador ligou" do dashboard.
 
 A cena é Three.js puro, sem TresJS, para o loop de animação ficar à vista. Ela
 **só muda com o que chega ao vivo pelo WebSocket**: lê o store de dentro do
-próprio loop e nunca é refeita a cada mensagem. Só o cadastro (item que entra
-ou sai) e a troca de contraste reconstroem os objetos.
+próprio loop e nunca é refeita a cada mensagem. Só o cadastro (item ou tanque
+que entra ou sai), o cenário e a troca de contraste reconstroem objetos.
+
+**Vários tanques:** cada zona do cadastro (`tanque-01`, `tanque-02`...) é um
+tanque, montado pelo mesmo molde. Cadastrar um sensor com uma zona nova, pela
+tela Dispositivos, faz um segundo tanque aparecer na cena sozinho, cinza e
+"sem dados" até ele publicar.
+
+**Três cenários**, escolhidos no topo da tela e guardados nas preferências:
+piscicultura ao ar livre, galpão e aquário de exposição. O tanque, os dados e as
+cores são os mesmos nos três; muda o ambiente, a luz e os peixes (tilápias na
+criação, ornamentais no aquário).
+
+**Navegação:** a visão geral mostra um selo por tanque e um pino só nos itens
+fora do normal. Clicar no tanque (ou no selo) voa até ele e abre as estatísticas
+do aquário; clicar num item chega perto e abre o painel dele. Esc ou "Voltar"
+sobem um nível, e o foco fica na URL (`/gemeo-3d?tanque=tanque-01&item=od-01`),
+que é o link "Ver no 3D" de Dispositivos.
 
 | Onde | O quê |
 | --- | --- |
-| `src/plant/layout.ts` | a posição de cada item **pelo id do cadastro** (`SCENE_LAYOUT`), as peças fixas e os tubos, sempre de um bocal a outro (`PIPES`) |
-| `src/scene/TwinScene.ts` | a cena: renderer, câmera, o loop único, cores, clique e destaque |
+| `src/plant/roles.ts` | o papel de cada item, pelo prefixo do id (`od-`, `bomba-rec-`...), depois pela chave da variável |
+| `src/plant/tanks.ts` | `planTanks`: os tanques do cadastro, com a posição de cada item, os vínculos (que leitura mexe em quê) e os tubos |
+| `src/plant/layout.ts` | o molde do tanque: `SCENE_LAYOUT` (posição **pelo id**), `ROLE_LAYOUT` (pelo papel), `AUTO_SLOTS` e `PIPE_TEMPLATE` |
+| `src/scene/TwinScene.ts` | a cena: renderer, o loop único, os tanques, o cenário, o foco, o clique e a dica |
+| `src/scene/TankRig.ts` | um tanque inteiro em coordenadas locais: itens, tubos, água, peixes, efeitos, selo e pinos |
+| `src/scene/environments/` | os cenários (`farm.ts`, `warehouse.ts`, `showroom.ts`), o céu e as árvores instanciadas (`shared.ts`) |
+| `src/scene/fish.ts` | os peixes: um `InstancedMesh` por tanque, com a cauda ondulando no shader |
+| `src/scene/CameraRig.ts` | a câmera que voa até o tanque ou o item; instantânea com movimento reduzido |
+| `src/scene/markers.ts` | o selo do tanque, os pinos e a dica do mouse, em HTML por cima do canvas |
+| `src/scene/focus.ts` | visão geral, tanque e item: para onde cada clique e cada Esc levam |
+| `src/scene/quality.ts` | baixa a qualidade sozinha sem placa de vídeo ou com quadros lentos (ou com `?qualidade=baixa`) |
 | `src/scene/models.ts` | os modelos de poucos polígonos; cada um declara os próprios bocais |
 | `src/scene/pipes.ts` | o caminho dos tubos: sai e chega no eixo de cada bocal, com as curvas arredondadas |
-| `src/scene/effects.ts` | bolhas, jatos, fluxo nos tubos e o cardume, todos com `InstancedMesh` |
-| `src/scene/tokens.ts` | as cores da cena, lidas dos tokens do CSS |
-| `src/composables/useItemLevel.ts` | o estado de cada item: o pior entre a faixa e a IA, ou "sem dados" |
-| `src/components/TwinPanel.vue` | o painel ao clicar: leitura, mini gráfico ao vivo, saúde prevista e comandos |
-| `src/components/FaultControl.vue` | o painel do simulador (IOT-05): injetar falha e reparar, só para operador e admin |
+| `src/scene/effects.ts` | bolhas, jatos e o fluxo nos tubos, com `InstancedMesh` |
+| `src/scene/tokens.ts` | as cores da cena, lidas dos tokens do CSS (os dois contrastes) |
+| `src/views/TwinView.vue` | a tela imersiva: caminho, seletor de cenário, legenda e o cartão da direita |
+| `src/components/TwinOverview.vue` | a visão geral: um cartão por tanque e o que está fora do normal |
+| `src/components/TankPanel.vue` | as estatísticas do aquário: água, bomba (IA), atuadores, alertas e itens |
+| `src/components/TwinPanel.vue` | o painel de um item: leitura, mini gráfico ao vivo, saúde prevista e comandos |
+| `src/composables/useTwinTanks.ts` | o resumo de cada tanque para os painéis, pela mesma conta da cena |
 
-**O que mexe em quê:**
+**O que mexe em quê**, em cada tanque, pelo dispositivo do papel:
 
 | Dado ao vivo | Na cena |
 | --- | --- |
-| nível (`nivel-01`) | altura da água e o feixe do sensor ultrassônico |
-| turbidez (`turbidez-01`) | cor e transparência da água |
-| luminosidade (`luz-01`) | dia e noite: céu, sol e a luz do aquário |
-| oxigênio (`od-01`) | ritmo do cardume; abaixo de 4 mg/L os peixes sobem para a superfície |
-| vazão (`bomba-rec-01`) | partículas nos tubos da recirculação e o jato de retorno |
-| vibração (`bomba-rec-01`) | tremor da bomba: quanto mais vibração, mais treme |
+| nível (`nivel-NN`) | altura da água e o feixe do sensor ultrassônico; sem sensor de nível o tanque fica sem água (nada é inventado) |
+| turbidez (`turbidez-NN`) | cor e transparência da água |
+| luminosidade (`luz-NN`) | dia e noite do cenário (média dos tanques): céu, sol, lua, estrelas, postes, janelas e a luz do aquário |
+| oxigênio (`od-NN`) | ritmo do cardume e da cauda; abaixo de 4 mg/L os peixes sobem para a superfície |
+| vazão (`bomba-rec-NN`) | partículas nos tubos da recirculação e o jato de retorno |
+| vibração (`bomba-rec-NN`) | tremor da bomba: quanto mais vibração, mais treme |
 | estado dos atuadores | bolhas do aerador, jato da reposição, ventoinhas e lâmpadas |
 
 **Cor de cada item:** normal, atenção, crítico ou sem dados. Vale o pior entre a
 faixa do cadastro, a saúde prevista pela IA (vermelho abaixo de 40 % ou com
 menos de 24 h de vida útil, amarelo abaixo de 70 %) e um alerta aberto da IA
-(os alertas sem `field`). O estado também vai escrito no rótulo.
+(os alertas sem `field`). O estado também vai escrito no selo, no pino e na dica.
 
-**Sem dados:** se nada chegar por 10 s, a cena congela, fica cinza e avisa; volta
-sozinha quando as leituras voltam. No modo simulado, o botão "Parar o
-simulador", no rodapé do menu, corta as mensagens para testar isso.
+**Sem dados:** se nenhuma telemetria chegar por 10 s, a cena congela, fica
+cinza e avisa; volta sozinha quando as leituras voltam. Um tanque sem nenhum
+dispositivo publicando para sozinho, mesmo com os outros vivos. No modo
+simulado, o botão "Parar o simulador", no rodapé do menu, corta as mensagens.
 
-**Para pôr um item novo na cena:** dê a ele uma posição em `SCENE_LAYOUT`, pelo
-id. Sem posição, ele entra sozinho: sonda nova na borda da frente do tanque,
-outro tipo numa fila no chão. Tubo novo vai em `PIPES`, de `<id>.<bocal>` a
-`<id>.<bocal>`; ele só aparece com os dois bocais na cena.
+**Para pôr um item novo na cena:** use o prefixo da convenção no id (`ph-02`,
+`od-03`...) e ele entra no lugar do papel no tanque da zona dele; o formulário
+de cadastro já sugere o id assim. Um id fora da convenção entra sozinho na
+borda da frente (sondas) ou numa fila no chão; para um lugar fixo, dê a posição
+em `SCENE_LAYOUT`, pelo id. Tubo novo vai em `PIPE_TEMPLATE`, de `<papel>.<bocal>`
+a `<papel>.<bocal>`; ele só aparece com os dois bocais na cena.
+
+**Desempenho:** em desenvolvimento, `__twin.stats()` no console mostra as
+chamadas de desenho, os triângulos e a memória da placa de vídeo.
+
+## Dispositivos (WEB-03)
+
+Um cartão por dispositivo, agrupados por tanque, com a leitura ao vivo, o mini
+gráfico das últimas mensagens, a régua da faixa e a situação (publicando, parou,
+sem dados). O resumo do topo também filtra, e cada tanque tem o link para vê-lo
+no 3D. Clicar num cartão abre o detalhe pela direita, onde o admin edita e
+desativa. No cadastro, o id é sugerido pela convenção dos prefixos e a zona
+lista as que já existem: uma zona nova cria outro tanque.
 
 ## Página Ferramentas
 

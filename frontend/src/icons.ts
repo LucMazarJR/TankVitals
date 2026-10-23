@@ -20,6 +20,15 @@ import {
   ThermometerSun,
   Cog,
   Power,
+  Fish,
+  MapIcon,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Layers,
+  Plus,
+  X,
+  Search,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { DeviceKind } from './domain/devices'
@@ -69,6 +78,15 @@ export const UI_ICON = {
   dispositivo: RadioTower,
   analise: ChartNoAxesColumn,
   atualizando: RefreshCw,
+  tanque: Fish,
+  visaoGeral: MapIcon,
+  voltar: ChevronLeft,
+  abrir: ChevronRight,
+  link: ExternalLink,
+  cenario: Layers,
+  novo: Plus,
+  fechar: X,
+  buscar: Search,
 }
 
 /** Ícone do tipo de dispositivo, para a lista do cadastro e o painel do 3D. */

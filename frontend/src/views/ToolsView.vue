@@ -3,9 +3,11 @@
 // abertas só em 127.0.0.1, como o enunciado pede, e o que mostrar em cada uma
 // na apresentação. Cada link é testado daqui: se não responder, a pessoa sabe
 // antes de clicar.
-import { onMounted, reactive, type Component } from 'vue'
+import { onMounted, onUnmounted, reactive, type Component } from 'vue'
 import { BookOpen, Database, ExternalLink, Rabbit, RefreshCw, ServerCog } from 'lucide-vue-next'
 import { API_BASE } from '../api/http'
+import { formatAge } from '../composables/useDeviceState'
+import { useNow } from '../composables/useNow'
 import { TOOL_URLS } from '../config'
 
 type Probe = 'checking' | 'up' | 'down'
@@ -60,42 +62,66 @@ const TOOLS: Tool[] = [
   },
 ]
 
-const status = reactive<Record<string, Probe>>({})
+interface ProbeResult {
+  state: Probe
+  /** Quanto a resposta levou, em ms. */
+  ms: number | null
+  /** Quando foi o último teste. */
+  at: number | null
+}
 
+const status = reactive<Record<string, ProbeResult>>({})
 const PROBE_TIMEOUT_MS = 4000
+/** Testa de novo sozinho: quem sobe o compose durante a aula vê o status mudar. */
+const REPROBE_MS = 30_000
+const now = useNow()
 
 /**
  * Testa se o endereço responde. Fora do app, o navegador não deixa ler a
  * resposta (`no-cors`), mas deixa saber se ela veio: é o que basta aqui.
  */
 async function probe(tool: Tool): Promise<void> {
-  status[tool.id] = 'checking'
+  const previous = status[tool.id]
+  status[tool.id] = { state: 'checking', ms: previous?.ms ?? null, at: previous?.at ?? null }
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+  const started = performance.now()
+  let state: Probe = 'down'
   try {
     const response = await fetch(tool.url, {
       mode: tool.sameOrigin ? 'same-origin' : 'no-cors',
       cache: 'no-store',
       signal: controller.signal,
     })
-    status[tool.id] = tool.sameOrigin && !response.ok ? 'down' : 'up'
+    state = tool.sameOrigin && !response.ok ? 'down' : 'up'
   } catch {
-    status[tool.id] = 'down'
+    state = 'down'
   } finally {
     window.clearTimeout(timeout)
   }
+  status[tool.id] = { state, ms: state === 'up' ? Math.round(performance.now() - started) : null, at: Date.now() }
 }
 
 function probeAll(): void {
   TOOLS.forEach((tool) => void probe(tool))
 }
 
-onMounted(probeAll)
+let timer: number | undefined
+onMounted(() => {
+  probeAll()
+  timer = window.setInterval(probeAll, REPROBE_MS)
+})
+onUnmounted(() => window.clearInterval(timer))
+
+function testedText(result: ProbeResult | undefined): string {
+  if (!result?.at) return 'testando agora'
+  return `testado ${formatAge(Math.max(0, Math.round((now.value - result.at) / 1000)))}`
+}
 
 const STATUS_TEXT: Record<Probe, string> = {
   checking: 'Verificando…',
   up: 'Respondendo',
-  down: 'Não respondeu daqui',
+  down: 'Fora do ar daqui',
 }
 </script>
 
@@ -123,9 +149,12 @@ const STATUS_TEXT: Record<Probe, string> = {
             <component :is="tool.icon" :size="19" aria-hidden="true" />
             {{ tool.name }}
           </h3>
-          <span :class="['tool-status', `is-${status[tool.id] ?? 'checking'}`]" role="status">
+          <span :class="['tool-status', `is-${status[tool.id]?.state ?? 'checking'}`]" role="status">
             <span class="tool-dot" aria-hidden="true" />
-            {{ STATUS_TEXT[status[tool.id] ?? 'checking'] }}
+            {{ STATUS_TEXT[status[tool.id]?.state ?? 'checking'] }}
+            <small v-if="status[tool.id]?.state === 'up' && status[tool.id]?.ms !== null">
+              · {{ status[tool.id]?.ms }} ms
+            </small>
           </span>
         </div>
 
@@ -133,7 +162,10 @@ const STATUS_TEXT: Record<Probe, string> = {
         <p class="tool-demo"><strong>Na apresentação:</strong> {{ tool.demo }}</p>
 
         <div class="tool-foot">
-          <code>{{ tool.url }}</code>
+          <span class="tool-where">
+            <code>{{ tool.url }}</code>
+            <small>{{ testedText(status[tool.id]) }}</small>
+          </span>
           <a class="button button-primary" :href="tool.url" target="_blank" rel="noopener noreferrer">
             Abrir
             <ExternalLink :size="15" aria-hidden="true" />
@@ -151,8 +183,9 @@ const STATUS_TEXT: Record<Probe, string> = {
         senha fica no Git nem nesta página.
       </p>
       <p>
-        "Não respondeu daqui" quer dizer que o serviço está fora do ar ou que esta não é a máquina da demo. Com o
-        compose de pé, confira em <code>docker compose ps</code>.
+        "Fora do ar daqui" quer dizer que o serviço não está de pé ou que esta não é a máquina da demo (no modo
+        simulado é o normal). Com o compose de pé, confira em <code>docker compose ps</code>. O teste se repete a cada
+        30 s.
       </p>
     </section>
   </main>
@@ -214,12 +247,31 @@ const STATUS_TEXT: Record<Probe, string> = {
   background: var(--nivel-ok);
 }
 
+.tool-status small {
+  color: var(--muted);
+  font-weight: var(--fw-bold);
+}
+
+/* Fora do ar não é alarme: na máquina errada ou no modo simulado é o esperado. */
 .tool-status.is-down {
-  color: var(--critico-ink);
+  color: var(--muted);
 }
 
 .tool-status.is-down .tool-dot {
-  background: var(--nivel-critico);
+  border: 2px dashed var(--muted);
+}
+
+.tool-where {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tool-where small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .tool-status.is-checking {

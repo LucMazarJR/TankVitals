@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import { SCENERIES, type Scenery } from '../scene/environments/types'
 
 /**
  * Preferências de exibição de cada pessoa, guardadas no navegador dela.
@@ -12,12 +13,15 @@ export type Contrast = 'padrao' | 'alto'
 export interface Preferences {
   /** "alto" reforça bordas, cores e pesos (tokens em src/style.css). */
   contrast: Contrast
+  /** O cenário do gêmeo 3D: piscicultura, galpão ou aquário. */
+  scenery: Scenery
 }
 
 const STORAGE_KEY = 'tankvitals.preferences'
 
 const DEFAULTS: Preferences = {
   contrast: 'padrao',
+  scenery: 'fazenda',
 }
 
 function load(): Preferences {
@@ -25,6 +29,7 @@ function load(): Preferences {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Preferences>
     return {
       contrast: stored.contrast === 'alto' ? 'alto' : DEFAULTS.contrast,
+      scenery: SCENERIES.includes(stored.scenery as Scenery) ? (stored.scenery as Scenery) : DEFAULTS.scenery,
     }
   } catch {
     // Aba anônima, armazenamento bloqueado ou valor estragado: fica no padrão.

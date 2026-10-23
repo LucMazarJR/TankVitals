@@ -17,7 +17,7 @@ import { useAuthStore, type Role } from '../stores/auth'
 import type { HistoryRange } from '../types'
 import { queryAudit, recordAudit } from './audit'
 import { getMockPlant } from './plant'
-import { mockRegistry } from './registry'
+import { mockRegistry, saveMockRegistry } from './registry'
 
 /**
  * As rotas de leitura, de cadastro e de comando no modo simulado, com a mesma
@@ -64,6 +64,7 @@ export async function mockCreateDevice(input: DeviceInput): Promise<Device> {
   }
   mockRegistry.devices.push(device)
   getMockPlant().applyRegistry()
+  saveMockRegistry()
   recordAudit({
     user: currentUser(),
     type: 'registry',
@@ -87,6 +88,7 @@ export async function mockUpdateDevice(id: string, update: DeviceUpdate): Promis
 
   mockRegistry.devices[index] = next
   getMockPlant().applyRegistry()
+  saveMockRegistry()
   recordAudit({
     user: currentUser(),
     type: 'registry',
@@ -116,6 +118,7 @@ export async function mockUpdateRule(id: string, update: RuleUpdate): Promise<Ru
   rule.updated_at = new Date().toISOString()
   rule.updated_by = useAuthStore().username
   getMockPlant().applyRegistry()
+  saveMockRegistry()
   const n = (v: number) => v.toLocaleString('pt-BR')
   recordAudit({
     user: currentUser(),
