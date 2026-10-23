@@ -49,8 +49,6 @@ export interface Placement {
   position: Vec3
   /** Giro em torno do eixo vertical, em graus. */
   rotationY?: number
-  /** Só a cena antiga usa (rótulos fixos); sai junto com ela. */
-  labelLift?: number
 }
 
 const RIM = TANK_3D.height
@@ -99,9 +97,6 @@ export const SCENE_LAYOUT: Record<string, Placement & { role?: Role }> = {
 export const AUTO_SLOTS = {
   rim: { start: [-1.5, RIM, FRONT] as Vec3, step: [0.45, 0, 0] as Vec3, perRow: 8, rowStep: [0, 0, -0.32] as Vec3 },
   floor: { start: [-3, 0, 2.1] as Vec3, step: [1.1, 0, 0] as Vec3, perRow: 7, rowStep: [0, 0, 1.1] as Vec3 },
-  // A cena antiga, de um tanque só: sai quando ela passar a montar um tanque por zona.
-  probe: { start: [-1.5, RIM, FRONT] as Vec3, step: [0.45, 0, 0] as Vec3 },
-  generic: { start: [-3, 0, 2.1] as Vec3, step: [1.1, 0, 0] as Vec3 },
 }
 
 /** Peças fixas da planta que não são dispositivos do cadastro. */
@@ -188,30 +183,3 @@ export const PIPE_TEMPLATE: PipeTemplate[] = [
     flow: 'refill',
   },
 ]
-
-// --- A cena antiga, de um tanque só ----------------------------------------------
-// Sai quando a cena passar a montar um tanque por zona com o PIPE_TEMPLATE.
-
-export interface PipeSpec extends Omit<PipeTemplate, 'flow'> {
-  flow: { device: string; field: string; full?: number }
-}
-
-const FLOW_BY_KEY: Record<PipeTemplate['flow'], PipeSpec['flow']> = {
-  flow: TANK.flow,
-  aerator: TANK.aerator,
-  refill: TANK.refill,
-}
-
-const PORT_ID: Record<string, string> = {
-  recirculation: TANK.recirculation.device,
-  aerator: TANK.aerator.device,
-  refill: TANK.refill.device,
-}
-
-export const PIPES: PipeSpec[] = PIPE_TEMPLATE.map((pipe) => {
-  const port = (end: string) => {
-    const [owner, nozzle] = end.split('.')
-    return `${PORT_ID[owner] ?? owner}.${nozzle}`
-  }
-  return { ...pipe, from: port(pipe.from), to: port(pipe.to), flow: FLOW_BY_KEY[pipe.flow] }
-})

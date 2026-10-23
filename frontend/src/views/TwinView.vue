@@ -4,7 +4,7 @@
 // cadastro e desmonta tudo ao sair.
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useAlerts } from '../composables/useAlerts'
-import { formatAge } from '../composables/useDeviceState'
+import { formatAge, useDeviceState } from '../composables/useDeviceState'
 import { ITEM_LEVEL_TEXT, useItemLevel, type ItemLevel } from '../composables/useItemLevel'
 import { useLiveValues } from '../composables/useLiveValues'
 import { useNow } from '../composables/useNow'
@@ -22,6 +22,7 @@ const now = useNow()
 const { value, state } = useLiveValues()
 const { alerts } = useAlerts()
 const { level, insight } = useItemLevel(() => alerts.value)
+const { connection } = useDeviceState()
 
 /** A cena congela se nada chegar por 10 s, de nenhum dispositivo (WEB-06). */
 function isFrozen(at: number): boolean {
@@ -43,8 +44,10 @@ function select(id: string | null) {
   selectedId.value = id
 }
 
-// A cena desenha o destaque; um item que saiu do cadastro fecha o painel.
-watch(selectedId, (id) => scene.value?.select(id))
+// A cena voa até o item; um item que saiu do cadastro fecha o painel.
+watch(selected, (device) =>
+  scene.value?.focus(device ? { level: 'item', tank: device.zone, device: device.id } : { level: 'overview' }),
+)
 watch(selected, (device) => {
   if (!device && selectedId.value) selectedId.value = null
 })
@@ -59,8 +62,9 @@ onMounted(() => {
   try {
     scene.value = new TwinScene(
       host.value,
-      { value, state, level, frozen: () => isFrozen(Date.now()) },
-      { onSelect: select },
+      { value, state, level, fresh: (id) => connection(id) === 'online', frozen: () => isFrozen(Date.now()) },
+      { onPick: (target) => select(target?.kind === 'item' ? target.device : null) },
+      { scenery: 'fazenda' },
     )
   } catch {
     // Sem WebGL (driver, máquina virtual, navegador antigo) não há cena.

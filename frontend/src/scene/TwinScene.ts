@@ -1,81 +1,65 @@
 import {
-  Box3,
-  Box3Helper,
-  Color,
-  DirectionalLight,
-  DoubleSide,
-  GridHelper,
-  Group,
-  HemisphereLight,
   Mesh,
-  MeshStandardMaterial,
-  type Object3D,
+  MeshBasicMaterial,
+  NeutralToneMapping,
   PCFShadowMap,
-  PerspectiveCamera,
-  PlaneGeometry,
-  PointLight,
   Raycaster,
+  RingGeometry,
   Scene,
+  Sphere,
   Timer,
-  TubeGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
-import { ITEM_LEVEL_TEXT, type ItemLevel } from '../composables/useItemLevel'
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import type { Device } from '../domain/devices'
-import {
-  AUTO_SLOTS,
-  FIXTURES,
-  PIPES,
-  SCENE_LAYOUT,
-  TANK,
-  TANK_3D,
-  type PipeSpec,
-  type Placement,
-  type Vec3,
-} from '../plant/layout'
-import { Bubbles, PipeFlow, School, Stream } from './effects'
-import { buildFilter, buildItem, buildTank, type ItemModel, type TankModel } from './models'
-import { roundedPath, routePoints } from './pipes'
+import { planTanks, type TankSpec } from '../plant/tanks'
+import { CameraRig, type CameraPose, type ZoomLimits } from './CameraRig'
+import { disposeTree } from './dispose'
+import { createEnvironment } from './environments'
+import type { Environment, Scenery } from './environments/types'
+import type { PickTarget, TwinFocus } from './focus'
+import { Tooltip } from './markers'
+import { detectQuality, FrameBudget, type Quality } from './quality'
+import { TankRig, type RigSource } from './TankRig'
 import { readPalette, type Palette } from './tokens'
 
 /**
- * O gêmeo digital do tanque (WEB-05), em Three.js puro: o loop de animação
- * fica aqui, explícito. A cena nunca é refeita a cada mensagem: ela lê o store
- * ao vivo de dentro do loop, por `TwinSource`. Só o cadastro (itens que entram
- * e saem) e a troca de contraste reconstroem os objetos.
+ * O gêmeo digital (WEB-05 a WEB-08), em Three.js puro: o loop de animação fica
+ * aqui, explícito. A cena nunca é refeita a cada mensagem: ela lê o store ao
+ * vivo de dentro do loop, por `TwinSource`. Só o cadastro (tanques e itens que
+ * entram e saem), o cenário e o contraste reconstroem objetos.
+ *
+ * Cada zona do cadastro é um tanque (`TankRig`), e o cenário escolhido decide
+ * onde cada um fica.
  */
 
 /** O que a cena lê do app, de dentro do loop. */
-export interface TwinSource {
-  /** Leitura recente, ou `null` quando não há (ou ficou velha). */
-  value(device: string, field: string): number | null
-  state(device: string, field: string): boolean | null
-  /** Estado do item: a faixa e a IA, ou "sem dados" (WEB-06). */
-  level(device: Device): ItemLevel
+export interface TwinSource extends RigSource {
   /** Nada chegou nos últimos 10 s: a cena congela e avisa. */
   frozen(): boolean
 }
 
 /** O que a cena avisa à tela. */
 export interface TwinHandlers {
-  /** Clicou num item (ou no rótulo dele); `null` é clique no vazio. */
-  onSelect(deviceId: string | null): void
+  /** Clicou num tanque ou num item; `null` é clique no vazio. */
+  onPick(target: PickTarget | null): void
 }
 
-interface SceneItem {
-  device: Device
-  model: ItemModel
-  labelEl: HTMLElement
-  labelText: string
-  level: ItemLevel | null
+export interface Insets {
+  right: number
+  bottom: number
 }
 
-/** Estado e rótulos mudam 4 vezes por segundo (e só se mudaram); o resto anda a cada quadro. */
+/** Estado e marcadores mudam 4 vezes por segundo (e só se mudaram); o resto anda a cada quadro. */
 const STATUS_EVERY_S = 0.25
+
+const LIMITS: Record<TwinFocus['level'], ZoomLimits> = {
+  overview: { min: 4, max: 48 },
+  tank: { min: 2.5, max: 16 },
+  item: { min: 1.1, max: 8 },
+}
 
 export class TwinScene {
   private readonly container: HTMLElement
@@ -83,83 +67,76 @@ export class TwinScene {
   private readonly handlers: TwinHandlers
   private readonly renderer: WebGLRenderer
   private readonly labels: CSS2DRenderer
-  private readonly camera: PerspectiveCamera
-  private readonly controls: OrbitControls
+  private readonly cameraRig: CameraRig
+  private readonly tooltip: Tooltip
   private readonly scene = new Scene()
   private readonly timer = new Timer()
   private readonly resize: ResizeObserver
+  private readonly budget = new FrameBudget()
+  private readonly quality: Quality
   private palette: Palette
 
-  /** O que não depende do cadastro: chão, luzes, tanque e filtro. */
-  private fixed = new Group()
-  /** Itens do cadastro e os tubos entre eles. */
-  private dynamic = new Group()
-  private tank!: TankModel
-  private items = new Map<string, SceneItem>()
-  private nozzles = new Map<string, Object3D>()
-  private devices: Device[] = []
-  private flows: Array<{ spec: PipeSpec; flow: PipeFlow }> = []
-  private bubbles!: Bubbles
-  private refillJet!: Stream
-  private returnJet!: Stream
-  private school!: School
-  private hemi!: HemisphereLight
-  private sun!: DirectionalLight
-  private tankLamp!: PointLight
-  /** Quanto é dia, de 0 (noite) a 1, pela luminosidade lida; anda suave. */
-  private daylight = 1
+  private scenery: Scenery
+  private env: Environment | null = null
+  private specs: TankSpec[] = []
+  private readonly rigs = new Map<string, TankRig>()
+  /** Muda quando os tanques ou o tamanho deles mudam: aí o cenário se refaz. */
+  private layoutKey = ''
+
+  private focusTarget: TwinFocus = { level: 'overview' }
+  private insets: Insets = { right: 0, bottom: 0 }
+  private framed = false
+  private selection: Mesh | null = null
 
   private statusTimer = 0
   /** Sem mensagem há mais de 10 s: nada anda, tudo fica cinza. */
   private frozen = true
-  /** Relógio das animações: para quando a cena congela. */
+  /** Relógio do cenário (nuvens): para quando a cena congela. */
   private t = 0
-  /** Nível da água desenhado agora, em %; anda suave até a leitura. */
-  private shownLevel: number | null = null
-  // Clique e destaque (WEB-08).
+  /** Quanto é dia, de 0 (noite) a 1, pela luminosidade lida; anda suave. */
+  private daylight = 1
+  private targetDaylight = 1
+
+  // Clique e dica do mouse (WEB-08).
   private readonly raycaster = new Raycaster()
   private readonly pointer = new Vector2()
   private pressedAt: { x: number; y: number } | null = null
   private hover: PointerEvent | null = null
-  private selectedId: string | null = null
-  private selection: Box3Helper | null = null
+  private hovering: { target: PickTarget; x: number; y: number } | null = null
 
-  /** Quem pediu menos movimento no sistema não vê a bomba tremer; a cor e o painel continuam. */
+  /** Quem pediu menos movimento no sistema: câmera sem voo, bomba sem tremer. */
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-  constructor(container: HTMLElement, source: TwinSource, handlers: TwinHandlers) {
+  constructor(container: HTMLElement, source: TwinSource, handlers: TwinHandlers, options: { scenery: Scenery }) {
     this.container = container
     this.source = source
     this.handlers = handlers
+    this.scenery = options.scenery
     this.palette = readPalette()
 
     this.renderer = new WebGLRenderer({ antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.quality = detectQuality(this.renderer)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatio))
+    this.renderer.toneMapping = NeutralToneMapping
+    this.renderer.toneMappingExposure = 1
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.domElement.classList.add('twin-canvas')
     container.append(this.renderer.domElement)
 
-    // Rótulos em HTML por cima do canvas: texto nítido em qualquer zoom.
+    // Selos e pinos em HTML por cima do canvas: texto nítido em qualquer zoom.
     this.labels = new CSS2DRenderer()
     this.labels.domElement.classList.add('twin-labels')
     container.append(this.labels.domElement)
+    this.tooltip = new Tooltip(container)
 
-    this.camera = new PerspectiveCamera(38, 1, 0.1, 100)
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-    this.controls.target.set(0.55, 0.9, 0)
-    this.controls.enableDamping = true
-    this.controls.minDistance = 4
-    this.controls.maxDistance = 18
-    this.controls.maxPolarAngle = 1.45
-
-    this.scene.add(this.fixed, this.dynamic)
-    this.buildFixed()
+    this.cameraRig = new CameraRig(this.renderer.domElement)
 
     const canvas = this.renderer.domElement
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointerup', this.onPointerUp)
     canvas.addEventListener('pointermove', this.onPointerMove)
+    canvas.addEventListener('pointerleave', this.onPointerLeave)
 
     this.resize = new ResizeObserver(() => this.fit())
     this.resize.observe(container)
@@ -168,56 +145,54 @@ export class TwinScene {
     this.renderer.setAnimationLoop((time) => this.frame(time))
   }
 
-  /** Monta os itens do cadastro. Chamado quando o cadastro muda, nunca por mensagem. */
+  /** Monta os tanques do cadastro. Chamado quando o cadastro muda, nunca por mensagem. */
   setDevices(devices: Device[]): void {
-    this.devices = devices
-    this.clear(this.dynamic)
-    this.items.clear()
-    this.flows = []
-    for (const key of [...this.nozzles.keys()]) {
-      if (!key.startsWith('tank.') && !key.startsWith('filter.')) this.nozzles.delete(key)
+    this.specs = planTanks(devices)
+    const wanted = new Set(this.specs.map((spec) => spec.id))
+    for (const [id, rig] of this.rigs) {
+      if (!wanted.has(id)) this.removeRig(id, rig)
+    }
+    for (const spec of this.specs) {
+      const rig = this.rigs.get(spec.id)
+      if (rig && rig.spec.signature === spec.signature) {
+        rig.updateSpec(spec)
+        continue
+      }
+      if (rig) this.removeRig(spec.id, rig)
+      this.addRig(spec)
     }
 
-    const used = { probe: 0, generic: 0 }
-    for (const device of devices) {
-      const placement = SCENE_LAYOUT[device.id] ?? autoPlacement(device, used)
-      const model = buildItem(placement.model, this.palette)
-      model.root.position.set(...placement.position)
-      model.root.rotation.y = ((placement.rotationY ?? 0) * Math.PI) / 180
-      model.labelAnchor.position.y += placement.labelLift ?? 0
-      model.root.traverse((object) => {
-        object.userData.deviceId = device.id
-      })
-      this.dynamic.add(model.root)
-      for (const [name, nozzle] of Object.entries(model.nozzles)) this.nozzles.set(`${device.id}.${name}`, nozzle)
-
-      const labelEl = makeLabel()
-      labelEl.classList.add('is-item')
-      labelEl.addEventListener('click', () => this.handlers.onSelect(device.id))
-      model.labelAnchor.add(new CSS2DObject(labelEl))
-      this.items.set(device.id, { device, model, labelEl, labelText: '', level: null })
-    }
-
-    this.scene.updateMatrixWorld(true)
-    this.buildPipes()
+    const layoutKey = this.specs.map((s) => `${s.id}:${Object.values(s.footprint).map((v) => v.toFixed(2)).join(',')}`).join('|')
     this.statusTimer = 0
-    this.select(this.selectedId)
+    if (layoutKey !== this.layoutKey) {
+      this.layoutKey = layoutKey
+      this.buildEnvironment()
+      this.applyFocus(true)
+    } else {
+      // Mesmo desenho: a câmera fica onde a pessoa deixou.
+      this.placeRigs()
+    }
   }
 
-  /** Destaca um item: caixa em volta na cena e o rótulo marcado. */
-  select(deviceId: string | null): void {
-    this.selectedId = deviceId
-    if (this.selection) {
-      this.scene.remove(this.selection)
-      this.selection.dispose()
-      this.selection = null
-    }
-    for (const item of this.items.values()) item.labelEl.classList.toggle('is-selected', item.device.id === deviceId)
-    const item = deviceId ? this.items.get(deviceId) : undefined
-    if (!item) return
-    const box = new Box3().setFromObject(item.model.root).expandByScalar(0.06)
-    this.selection = new Box3Helper(box, this.palette['--accent'])
-    this.scene.add(this.selection)
+  /** Troca o cenário: o ambiente, os peixes e onde fica cada tanque. */
+  setScenery(id: Scenery): void {
+    if (id === this.scenery) return
+    this.scenery = id
+    this.rebuildAll()
+  }
+
+  /** Para onde olhar; a câmera voa até lá (ou pula, com movimento reduzido). */
+  focus(target: TwinFocus): void {
+    this.focusTarget = target
+    this.applyFocus(false)
+  }
+
+  /** O quanto os painéis da tela cobrem o canvas, à direita e embaixo. */
+  setInsets(insets: Insets): void {
+    if (insets.right === this.insets.right && insets.bottom === this.insets.bottom) return
+    this.insets = insets
+    this.fit()
+    this.applyFocus(true)
   }
 
   /**
@@ -227,10 +202,13 @@ export class TwinScene {
    */
   refreshPalette(): void {
     this.palette = readPalette()
-    this.clear(this.fixed)
-    this.nozzles.clear()
-    this.buildFixed()
-    this.setDevices(this.devices)
+    this.rebuildAll()
+  }
+
+  /** Números do desenho, para conferir as metas de desempenho em desenvolvimento. */
+  stats() {
+    const { render, memory } = this.renderer.info
+    return { calls: render.calls, triangles: render.triangles, geometries: memory.geometries, textures: memory.textures, quality: this.quality.level }
   }
 
   dispose(): void {
@@ -239,11 +217,16 @@ export class TwinScene {
     canvas.removeEventListener('pointerdown', this.onPointerDown)
     canvas.removeEventListener('pointerup', this.onPointerUp)
     canvas.removeEventListener('pointermove', this.onPointerMove)
-    this.selection?.dispose()
+    canvas.removeEventListener('pointerleave', this.onPointerLeave)
     this.resize.disconnect()
-    this.controls.dispose()
-    this.clear(this.dynamic)
-    this.clear(this.fixed)
+    this.cameraRig.dispose()
+    this.clearSelection()
+    for (const [id, rig] of this.rigs) this.removeRig(id, rig)
+    if (this.env) {
+      this.env.dispose()
+      this.scene.remove(this.env.root)
+    }
+    this.tooltip.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
     this.labels.domElement.remove()
@@ -251,95 +234,163 @@ export class TwinScene {
 
   // --- montagem ---------------------------------------------------------------------
 
-  private buildFixed(): void {
-    const p = this.palette
-    this.scene.background = p['--scene-sky-day'].clone()
-
-    this.hemi = new HemisphereLight(p['--scene-sky-day'], p['--scene-floor'], 1.1)
-    this.sun = new DirectionalLight(0xffffff, 1.6)
-    this.sun.position.set(6, 10, 6)
-    this.sun.castShadow = true
-    this.sun.shadow.mapSize.set(1024, 1024)
-    Object.assign(this.sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7 })
-    // A luz do aquário: quase nada de dia, acesa à noite.
-    this.tankLamp = new PointLight(0xffffff, 0.6, 9)
-    this.tankLamp.position.set(0, 3.4, 0.4)
-    this.fixed.add(this.hemi, this.sun, this.tankLamp)
-
-    const floor = new Mesh(
-      new PlaneGeometry(30, 30),
-      new MeshStandardMaterial({ color: p['--scene-floor'], roughness: 1, side: DoubleSide }),
-    )
-    floor.rotation.x = -Math.PI / 2
-    floor.receiveShadow = true
-    const grid = new GridHelper(30, 30, p['--metal'], p['--metal'])
-    grid.position.y = 0.002
-    for (const material of [grid.material].flat()) Object.assign(material, { transparent: true, opacity: 0.18 })
-    this.fixed.add(floor, grid)
-
-    this.tank = buildTank(p)
-    this.fixed.add(this.tank.root)
-    for (const [name, nozzle] of Object.entries(this.tank.nozzles)) this.nozzles.set(`tank.${name}`, nozzle)
-
-    const filter = buildFilter(p)
-    filter.root.position.set(...FIXTURES.filter.position)
-    this.fixed.add(filter.root)
-    for (const [name, nozzle] of Object.entries(filter.nozzles)) this.nozzles.set(`filter.${name}`, nozzle)
-    // Bolhas e jatos: ficam na cena; aparecem quando o atuador liga.
-    this.bubbles = new Bubbles(p['--surface'])
-    this.refillJet = new Stream(p['--water-line'])
-    this.returnJet = new Stream(p['--water-line'])
-    this.fixed.add(this.bubbles.mesh, this.refillJet.column, this.refillJet.drops, this.returnJet.column, this.returnJet.drops)
-
-    this.school = new School([p['--brand-fish'], p['--fish-2']])
-    this.school.mesh.visible = false
-    this.fixed.add(this.school.mesh)
-
-    const filterLabel = makeLabel()
-    filterLabel.classList.add('is-fixture')
-    filterLabel.textContent = 'Filtro'
-    filter.labelAnchor.add(new CSS2DObject(filterLabel))
-
-    const tankLabel = makeLabel()
-    tankLabel.classList.add('is-fixture')
-    tankLabel.textContent = TANK.id
-    const tankAnchor = new Group()
-    tankAnchor.position.set(0, 0.05, TANK_3D.depth / 2 + 0.25)
-    tankAnchor.add(new CSS2DObject(tankLabel))
-    this.fixed.add(tankAnchor)
-
-    this.scene.updateMatrixWorld(true)
+  private addRig(spec: TankSpec): void {
+    const rig = new TankRig(spec, {
+      palette: this.palette,
+      fish: this.scenery === 'aquario' ? 'ornamental' : 'tilapia',
+      fishCount: this.quality.fishPerTank + (this.scenery === 'aquario' ? 2 : 0),
+      reducedMotion: this.reducedMotion,
+      onPick: (target) => this.handlers.onPick(target),
+    })
+    this.rigs.set(spec.id, rig)
+    this.scene.add(rig.root)
   }
 
-  /** Só monta o tubo com os dois bocais na cena: item desativado leva o tubo junto. */
-  private buildPipes(): void {
-    const water = new MeshStandardMaterial({
-      color: this.palette['--surface'],
-      transparent: true,
-      opacity: 0.42,
-      roughness: 0.2,
-      depthWrite: false,
-    })
-    const air = water.clone()
-    air.opacity = 0.6
+  private removeRig(id: string, rig: TankRig): void {
+    this.scene.remove(rig.root)
+    rig.dispose()
+    this.rigs.delete(id)
+  }
 
-    for (const spec of PIPES) {
-      const from = this.nozzles.get(spec.from)
-      const to = this.nozzles.get(spec.to)
-      if (!from || !to) continue
-      const path = roundedPath(routePoints(from, to, spec.via))
-      const length = path.getLength()
-      const tube = new Mesh(
-        new TubeGeometry(path, Math.ceil(length * 28), spec.radius, 10, false),
-        spec.medium === 'air' ? air : water,
-      )
-      tube.renderOrder = 3
-      tube.userData.pipe = spec.id
-      // O que corre dentro: água azul, ar branco.
-      const flow = new PipeFlow(path, spec.radius, spec.medium === 'air' ? this.palette['--surface'] : this.palette['--accent'])
-      this.dynamic.add(tube, flow.mesh)
-      this.flows.push({ spec, flow })
+  /** O cenário em volta dos tanques, do tamanho que eles pedem. */
+  private buildEnvironment(): void {
+    if (this.env) {
+      this.scene.remove(this.env.root)
+      this.env.dispose()
     }
+    const env = createEnvironment(this.scenery)
+    const footprints = this.specs.map((spec) => spec.footprint)
+    const slots = env.slots(footprints)
+    env.build({ palette: this.palette, slots, footprints, quality: this.quality })
+    this.env = env
+    this.scene.add(env.root)
+    this.scene.fog = env.fog
+    this.scene.background = env.background
+    this.specs.forEach((spec, i) => this.rigs.get(spec.id)?.place(slots[i]))
+    env.update(this.daylight, this.t)
+  }
+
+  private placeRigs(): void {
+    if (!this.env) return
+    const slots = this.env.slots(this.specs.map((spec) => spec.footprint))
+    this.specs.forEach((spec, i) => this.rigs.get(spec.id)?.place(slots[i]))
+  }
+
+  /** Cenário novo ou paleta nova: refaz tudo, tanques inclusive (os peixes mudam de espécie). */
+  private rebuildAll(): void {
+    this.clearSelection()
+    for (const [id, rig] of this.rigs) this.removeRig(id, rig)
+    this.layoutKey = ''
+    if (this.env) {
+      this.scene.remove(this.env.root)
+      this.env.dispose()
+      this.env = null
+    }
+    const devices = this.specs.flatMap((spec) => spec.members.map((m) => m.device))
+    this.setDevices(devices)
+  }
+
+  // --- foco -------------------------------------------------------------------------
+
+  /** Leva a câmera, a sombra, os marcadores e o anel de seleção para o foco atual. */
+  private applyFocus(instant: boolean): void {
+    if (!this.env || !this.framed) return
+    // Foco num tanque ou item que saiu do cadastro: volta para a visão geral.
+    let focus = this.focusTarget
+    if (focus.level !== 'overview' && !this.rigs.has(focus.tank)) focus = { level: 'overview' }
+    if (focus.level === 'item' && !this.rigs.get(focus.tank)!.hasItem(focus.device)) focus = { level: 'tank', tank: focus.tank }
+
+    const pose = this.poseFor(focus)
+    this.cameraRig.flyTo(pose, LIMITS[focus.level], instant || this.reducedMotion)
+    this.fitShadow(focus)
+    this.updateSelection(focus)
+    this.statusTimer = 0
+  }
+
+  private poseFor(focus: TwinFocus): CameraPose {
+    const env = this.env!
+    const width = Math.max(1, this.container.clientWidth)
+    const height = Math.max(1, this.container.clientHeight)
+    const aspect = this.cameraRig.visibleAspect(width, height, this.insets)
+
+    if (focus.level === 'overview') {
+      const sphere = this.allBounds()
+      const distance = Math.max(9, sphere.radius * 2.15) * Math.max(1, 1.35 / aspect)
+      const target = sphere.center.clone().setY(1)
+      return { target, position: target.clone().addScaledVector(env.view.overview.clone().normalize(), distance) }
+    }
+
+    const rig = this.rigs.get(focus.tank)!
+    if (focus.level === 'tank') {
+      const sphere = rig.bounds()
+      const distance = 7 * Math.max(1, 1.3 / aspect)
+      return { target: sphere.center, position: sphere.center.clone().addScaledVector(env.view.tank.clone().normalize(), distance) }
+    }
+
+    // Item: chega perto, de frente para o tanque, mantendo o lado de onde a pessoa já olhava.
+    const sphere = rig.bounds(focus.device)
+    const camera = this.cameraRig.camera.position.clone().sub(sphere.center)
+    const azimuth = Math.max(-1.1, Math.min(1.1, Math.atan2(camera.x, camera.z)))
+    const elevation = 0.36
+    const direction = new Vector3(Math.sin(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.cos(azimuth) * Math.cos(elevation))
+    const distance = Math.min(4.2, Math.max(1.7, sphere.radius * 4.5)) * Math.max(1, 1.1 / aspect)
+    return { target: sphere.center, position: sphere.center.clone().addScaledVector(direction, distance) }
+  }
+
+  /** A esfera que envolve todos os tanques e seus equipamentos. */
+  private allBounds(): Sphere {
+    if (!this.rigs.size) return new Sphere(new Vector3(0, 1, 0), 4)
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    for (const rig of this.rigs.values()) {
+      const { footprint } = rig.spec
+      const { x, z } = rig.root.position
+      minX = Math.min(minX, x + footprint.minX)
+      maxX = Math.max(maxX, x + footprint.maxX)
+      minZ = Math.min(minZ, z + footprint.minZ)
+      maxZ = Math.max(maxZ, z + footprint.maxZ)
+    }
+    const center = new Vector3((minX + maxX) / 2, 1, (minZ + maxZ) / 2)
+    return new Sphere(center, Math.hypot(maxX - minX, maxZ - minZ) / 2)
+  }
+
+  /** A caixa da sombra cobre o que está em foco: sombra nítida onde se olha. */
+  private fitShadow(focus: TwinFocus): void {
+    const light = this.env!.keyLight
+    const sphere = focus.level === 'overview' ? this.allBounds() : this.rigs.get(focus.tank)!.bounds()
+    const r = sphere.radius + (focus.level === 'overview' ? 2 : 3.5)
+    light.target.position.copy(sphere.center).setY(0)
+    Object.assign(light.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 120 })
+    light.shadow.camera.updateProjectionMatrix()
+    // A luz se posiciona a partir do alvo novo, mesmo com a cena congelada.
+    this.env!.update(this.daylight, this.t)
+  }
+
+  /** O anel no chão do item escolhido. */
+  private updateSelection(focus: TwinFocus): void {
+    this.clearSelection()
+    if (focus.level !== 'item') return
+    const sphere = this.rigs.get(focus.tank)!.bounds(focus.device)
+    const radius = Math.max(0.28, Math.min(1.1, sphere.radius * 0.85))
+    const ring = new Mesh(
+      new RingGeometry(radius, radius + 0.05, 48),
+      new MeshBasicMaterial({ color: this.palette['--accent'], toneMapped: false, transparent: true, opacity: 0.9, depthWrite: false }),
+    )
+    ring.rotation.x = -Math.PI / 2
+    ring.position.copy(sphere.center)
+    ring.position.y = sphere.center.y - sphere.radius * 0.55
+    ring.renderOrder = 5
+    this.selection = ring
+    this.scene.add(ring)
+  }
+
+  private clearSelection(): void {
+    if (!this.selection) return
+    this.scene.remove(this.selection)
+    disposeTree(this.selection)
+    this.selection = null
   }
 
   // --- loop ---------------------------------------------------------------------------
@@ -347,10 +398,11 @@ export class TwinScene {
   private frame(time: number): void {
     this.timer.update(time)
     const dt = Math.min(this.timer.getDelta(), 0.1)
+    if (this.budget.tick(dt)) this.lowerQuality()
 
     if (this.hover) {
       // Um raio por quadro no máximo, não um por evento do mouse.
-      this.renderer.domElement.style.cursor = this.pick(this.hover) ? 'pointer' : ''
+      this.updateHover(this.hover)
       this.hover = null
     }
 
@@ -360,201 +412,70 @@ export class TwinScene {
       this.refreshStatus()
     }
 
-    // Congelada, a cena não anda: nem água, nem peças. Só a câmera continua livre.
+    // Congelada, a cena não anda: nem céu, nem água, nem peças. Só a câmera continua livre.
     if (!this.frozen) {
       this.t += dt
-      this.updateWater(dt)
-      this.updateEnvironment(dt)
-      this.updateActuators(dt)
-      this.updateFish(dt)
-      this.shakePump()
-      this.pulseCritical()
+      this.daylight += (this.targetDaylight - this.daylight) * Math.min(1, dt * 1.5)
+      this.env?.update(this.daylight, this.t)
     }
+    const glow = this.env?.tankGlow ?? 0.8
+    for (const rig of this.rigs.values()) rig.update(dt, this.source, this.daylight, glow)
+    if (this.selection) (this.selection.material as MeshBasicMaterial).opacity = 0.65 + 0.3 * Math.sin(time / 260)
 
-    this.controls.update()
-    this.renderer.render(this.scene, this.camera)
-    this.labels.render(this.scene, this.camera)
+    this.cameraRig.update(dt)
+    this.renderer.render(this.scene, this.cameraRig.camera)
+    this.labels.render(this.scene, this.cameraRig.camera)
   }
 
-  /** A água vai até o nível lido, sem pular: anda uma fração do caminho por quadro. */
-  private updateWater(dt: number): void {
-    const level = this.source.value(TANK.level.device, TANK.level.field)
-    if (level !== null) {
-      const target = Math.min(100, Math.max(0, level))
-      this.shownLevel = this.shownLevel === null ? target : this.shownLevel + (target - this.shownLevel) * Math.min(1, dt * 2)
-    }
-    const { water, surface } = this.tank
-    if (this.shownLevel === null) {
-      water.visible = surface.visible = false
-      return
-    }
-    const inner = TANK_3D.height - TANK_3D.sand - 0.08
-    const height = Math.max(0.001, (this.shownLevel / 100) * inner)
-    water.visible = surface.visible = true
-    water.scale.y = height
-    water.position.y = TANK_3D.sand + height / 2
-    surface.position.y = TANK_3D.sand + height + 0.002
-
-    // O feixe do sensor de nível vai até a superfície.
-    const beam = this.items.get(TANK.level.device)?.model.parts.beam
-    if (beam) {
-      const top = beam.parent!.position.y + 0.02
-      const length = Math.max(0.02, top - surface.position.y)
-      beam.visible = true
-      beam.scale.y = length
-      beam.position.y = 0.02 - length / 2
-    }
-  }
-
-  /** Cor de cada item e o texto dos rótulos. */
+  /** Estado dos tanques, marcadores, a dica e quanto é dia: 4 vezes por segundo. */
   private refreshStatus(): void {
     this.frozen = this.source.frozen()
-    for (const item of this.items.values()) {
-      const level = this.frozen ? 'vazio' : this.source.level(item.device)
-      if (level !== item.level) {
-        item.level = level
-        const color = this.levelColor(level)
-        for (const material of item.model.status) {
-          material.color.copy(color)
-          material.emissive.copy(color).multiplyScalar(level === 'vazio' ? 0 : 0.22)
-          material.emissiveIntensity = 1
+    // Qualidade baixa: a sombra é refeita aqui, 4 vezes por segundo, e não a cada quadro.
+    if (!this.renderer.shadowMap.autoUpdate) this.renderer.shadowMap.needsUpdate = true
+    const focus = this.focusTarget
+    let lux = 0
+    let readings = 0
+    for (const rig of this.rigs.values()) {
+      const status = rig.refreshStatus(this.source, this.frozen)
+      const focused = focus.level !== 'overview' && focus.tank === rig.id
+      const mode = focus.level === 'overview' ? 'overview' : focused ? 'focused' : 'background'
+      rig.updateMarkers(mode, focus.level === 'item' && focused ? focus.device : null, this.source)
+      const light = rig.spec.bindings.light
+      if (status.live && light) {
+        const value = this.source.value(light.device, light.field)
+        if (value !== null) {
+          lux += value
+          readings += 1
         }
-        item.labelEl.className = `twin-label is-item level-${level}`
-        item.labelEl.classList.toggle('is-selected', item.device.id === this.selectedId)
       }
+    }
+    // A raiz deixa o amanhecer e o entardecer visíveis, não só o meio-dia.
+    if (readings) this.targetDaylight = Math.min(1, Math.sqrt(Math.max(0, lux / readings) / 30000))
 
-      // Lâmpada do atuador: acesa quando ligado.
-      const lamp = item.model.lamp
-      if (lamp && item.device.state_field) {
-        const on = !this.frozen && this.source.state(item.device.id, item.device.state_field) === true
-        lamp.emissive.copy(on ? this.palette['--accent'] : this.palette['--night']).multiplyScalar(on ? 1.6 : 0)
-        lamp.color.copy(on ? this.palette['--surface'] : this.palette['--metal'])
-      }
-
-      // O estado vai escrito no rótulo, não só na cor.
-      const text =
-        level === 'vazio'
-          ? `${shortName(item.device)} · ${ITEM_LEVEL_TEXT.vazio}`
-          : level === 'ok'
-            ? labelText(item.device, this.source)
-            : `${labelText(item.device, this.source)} · ${ITEM_LEVEL_TEXT[level]}`
-      if (text !== item.labelText) {
-        item.labelText = text
-        item.labelEl.textContent = text
+    // A dica acompanha a leitura enquanto o mouse está parado em cima.
+    if (this.hovering) {
+      const { target, x, y } = this.hovering
+      const rig = this.rigs.get(target.tank)
+      if (rig) {
+        const { text, level } = rig.describe(target, this.source)
+        this.tooltip.show(text, level, x, y)
       }
     }
   }
 
-  /**
-   * O ambiente reage aos dados (WEB-07): a água turva com a turbidez e a cena
-   * vai do dia à noite pela luminosidade. Tudo anda suave até a leitura.
-   */
-  private updateEnvironment(dt: number): void {
-    const p = this.palette
-    const ease = Math.min(1, dt * 1.5)
-
-    const ntu = this.source.value(TANK.turbidity.device, TANK.turbidity.field)
-    if (ntu !== null) {
-      // Até 10 NTU é água limpa; perto dos 60 do crítico, barrenta.
-      const murk = Math.min(1, Math.max(0, (ntu - 10) / 50))
-      const target = p['--water'].clone().lerp(p['--scene-murky'], murk)
-      const material = this.tank.waterMaterial
-      material.color.lerp(target, ease)
-      material.opacity += (0.45 + 0.4 * murk - material.opacity) * ease
-    }
-
-    const lux = this.source.value(TANK.light.device, TANK.light.field)
-    if (lux !== null) {
-      // A raiz deixa o amanhecer e o entardecer visíveis, não só o meio-dia.
-      const target = Math.min(1, Math.sqrt(Math.max(0, lux) / 30000))
-      this.daylight += (target - this.daylight) * ease
-    }
-    const day = this.daylight
-    ;(this.scene.background as Color).copy(p['--scene-sky-night']).lerp(p['--scene-sky-day'], day)
-    this.hemi.intensity = 0.35 + 0.8 * day
-    this.sun.intensity = 0.15 + 1.5 * day
-    this.tankLamp.intensity = 0.3 + 2.4 * (1 - day)
+  /** A máquina não está dando conta: menos pixels e sombra mais leve, de uma vez só. */
+  private lowerQuality(): void {
+    this.renderer.setPixelRatio(1)
+    this.renderer.shadowMap.autoUpdate = false
+    this.fit()
   }
 
-  /**
-   * Atuadores animados quando ligados (WEB-07): partículas nos tubos pela
-   * vazão, bolhas do aerador, jatos da reposição e do retorno e as ventoinhas.
-   */
-  private updateActuators(dt: number): void {
-    const src = this.source
-    const surfaceY = this.tank.surface.visible ? this.tank.surface.position.y : TANK_3D.sand
-
-    for (const { spec, flow } of this.flows) flow.update(dt, this.rate(spec.flow))
-
-    const aerator = src.state(TANK.aerator.device, TANK.aerator.field) === true
-    this.bubbles.update(dt, this.t, aerator, this.tank.emitters.airstone, surfaceY)
-    this.refillJet.update(dt, src.state(TANK.refill.device, TANK.refill.field) ? 1 : 0, this.tank.emitters.refill, surfaceY)
-    this.returnJet.update(dt, this.rate(TANK.flow), this.tank.emitters.return, surfaceY)
-
-    for (const item of this.items.values()) {
-      const fan = item.model.parts.fan
-      const field = item.device.state_field
-      if (fan && field && src.state(item.device.id, field)) {
-        const axis = fan.userData.axis === 'z' ? 'z' : 'x'
-        fan.rotation[axis] += dt * 18
-      }
-    }
-  }
-
-  /** Peixes só existem com água desenhada; o ritmo vem do oxigênio dissolvido. */
-  private updateFish(dt: number): void {
-    const { surface } = this.tank
-    this.school.mesh.visible = surface.visible
-    if (!surface.visible) return
-    const oxygen = this.source.value(TANK.oxygen.device, TANK.oxygen.field)
-    this.school.update(dt, this.t, oxygen, TANK_3D.sand, surface.position.y)
-  }
-
-  /**
-   * Quanto mais vibração, mais a bomba treme (WEB-07). Saudável, perto de
-   * 1 mm/s, quase não mexe; perto dos 4,5 mm/s do crítico, treme forte. Só o
-   * corpo treme: os bocais ficam presos nos tubos.
-   */
-  private shakePump(): void {
-    const body = this.items.get(TANK.vibration.device)?.model.parts.body
-    if (!body) return
-    const vibration = this.source.value(TANK.vibration.device, TANK.vibration.field)
-    const running = this.source.state(TANK.recirculation.device, TANK.recirculation.field) === true
-    const amplitude =
-      !running || vibration === null || this.reducedMotion ? 0 : Math.min(1.4, Math.max(0, (vibration - 0.5) / 4)) * 0.03
-    // Senos de frequências diferentes: tremor que não se repete a cada quadro.
-    const t = this.t
-    body.position.set(amplitude * Math.sin(t * 53), amplitude * 0.4 * Math.sin(t * 61 + 2), amplitude * Math.sin(t * 47 + 1))
-    body.rotation.z = amplitude * 1.5 * Math.sin(t * 43)
-  }
-
-  /** Quanto corre num tubo: a vazão sobre a cheia, ou 1 e 0 pelo estado do atuador. */
-  private rate(flow: { device: string; field: string; full?: number }): number {
-    if (flow.full) {
-      const value = this.source.value(flow.device, flow.field)
-      return value === null ? 0 : Math.min(1.2, Math.max(0, value / flow.full))
-    }
-    return this.source.state(flow.device, flow.field) ? 1 : 0
-  }
-
-  /** O crítico pulsa: chama o olho mesmo de longe, no projetor. */
-  private pulseCritical(): void {
-    const glow = 1 + 0.9 * Math.sin(this.t * 6)
-    for (const item of this.items.values()) {
-      if (item.level !== 'critico') continue
-      for (const material of item.model.status) material.emissiveIntensity = glow
-    }
-  }
-
-  private levelColor(level: ItemLevel) {
-    const p = this.palette
-    return { ok: p['--nivel-ok'], atencao: p['--nivel-atencao'], critico: p['--nivel-critico'], vazio: p['--scene-nodata'] }[level]
-  }
-
-  // --- clique --------------------------------------------------------------------------
+  // --- clique e dica ------------------------------------------------------------------
 
   private readonly onPointerDown = (event: PointerEvent): void => {
     this.pressedAt = { x: event.clientX, y: event.clientY }
+    // A pessoa pegou a câmera no meio do voo: o voo para onde está.
+    this.cameraRig.cancel()
   }
 
   /** Clique de verdade, não o fim de um arrasto da câmera. */
@@ -562,23 +483,57 @@ export class TwinScene {
     if (!this.pressedAt) return
     const moved = Math.hypot(event.clientX - this.pressedAt.x, event.clientY - this.pressedAt.y)
     this.pressedAt = null
-    if (moved <= 6) this.handlers.onSelect(this.pick(event))
+    if (moved <= 6) this.handlers.onPick(this.pick(event))
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     this.hover = event
   }
 
-  /** O item do cadastro sob o ponteiro. Tubos e vidro não seguram o clique. */
-  private pick(event: PointerEvent): string | null {
+  private readonly onPointerLeave = (): void => {
+    this.hover = null
+    this.hovering = null
+    this.tooltip.hide()
+    this.renderer.domElement.style.cursor = ''
+  }
+
+  private updateHover(event: PointerEvent): void {
+    const target = this.pick(event)
+    this.renderer.domElement.style.cursor = target ? 'pointer' : ''
+    // Dica só com mouse e sem arrastar: no toque ela ficaria presa na tela.
+    if (!target || event.pointerType !== 'mouse' || event.buttons !== 0) {
+      this.hovering = null
+      this.tooltip.hide()
+      return
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    this.hovering = { target, x: event.clientX - rect.left, y: event.clientY - rect.top }
+    const rig = this.rigs.get(target.tank)
+    if (rig) {
+      const { text, level } = rig.describe(target, this.source)
+      this.tooltip.show(text, level, this.hovering.x, this.hovering.y)
+    }
+  }
+
+  /**
+   * O que está debaixo do ponteiro. O raio entra e sai da caixa invisível de
+   * cada tanque: um item acertado antes da saída (uma sonda dentro do vidro)
+   * vence; um item atrás do tanque perde para o tanque.
+   */
+  private pick(event: PointerEvent): PickTarget | null {
     const rect = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
-    this.raycaster.setFromCamera(this.pointer, this.camera)
-    for (const hit of this.raycaster.intersectObjects(this.dynamic.children, true)) {
-      const id = hit.object.userData.deviceId
-      if (typeof id === 'string') return id
+    this.raycaster.setFromCamera(this.pointer, this.cameraRig.camera)
+    const pickables = [...this.rigs.values()].flatMap((rig) => rig.pickables)
+    let tank: PickTarget | null = null
+    for (const hit of this.raycaster.intersectObjects(pickables, true)) {
+      const target = hit.object.userData.pick as PickTarget | undefined
+      if (!target) continue
+      if (target.kind === 'item') return target
+      if (!tank) tank = target
+      else if (target.tank === tank.tank) return tank
     }
-    return null
+    return tank
   }
 
   private fit(): void {
@@ -586,75 +541,11 @@ export class TwinScene {
     const height = Math.max(1, this.container.clientHeight)
     this.renderer.setSize(width, height)
     this.labels.setSize(width, height)
-    this.camera.aspect = width / height
-    this.camera.updateProjectionMatrix()
-    if (!this.framed) this.frameCamera()
+    this.cameraRig.setViewport(width, height, this.insets)
+    // Primeiro enquadramento só com o canvas já medido.
+    if (!this.framed && width > 2 && height > 2) {
+      this.framed = true
+      this.applyFocus(true)
+    }
   }
-
-  private framed = false
-
-  /**
-   * Primeiro enquadramento: a planta inteira (do reservatório à bomba) cabe na
-   * largura. Canvas mais estreito, câmera mais longe. Depois disso, quem manda
-   * na câmera é a pessoa.
-   */
-  private frameCamera(): void {
-    if (this.container.clientWidth < 2) return
-    this.framed = true
-    const distance = 8.4 * Math.max(1, 1.35 / this.camera.aspect)
-    const direction = new Vector3(5.3, 2.95, 6.9).normalize()
-    this.camera.position.copy(this.controls.target).addScaledVector(direction, distance)
-    this.controls.update()
-  }
-
-  /** Tira tudo de um grupo e devolve a memória de vídeo. */
-  private clear(group: Group): void {
-    group.traverse((object) => {
-      const mesh = object as Mesh
-      mesh.geometry?.dispose()
-      for (const material of [mesh.material ?? []].flat()) material.dispose()
-      // A luz do sol guarda o mapa de sombra na placa de vídeo.
-      if (object instanceof DirectionalLight) object.dispose()
-      if (object instanceof CSS2DObject) object.element.remove()
-    })
-    group.clear()
-  }
-}
-
-function makeLabel(): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'twin-label'
-  // A lista de itens ao lado da cena é o caminho acessível; o rótulo é visual.
-  el.setAttribute('aria-hidden', 'true')
-  return el
-}
-
-/** Nome no rótulo: a grandeza nos sensores, o nome do item no resto. */
-function shortName(device: Device): string {
-  return device.kind === 'sensor' && device.fields[0] ? device.fields[0].short : device.name
-}
-
-/** "pH 7,21", "Aerador · ligado", "Bomba de recirculação · 1,21 mm/s". */
-function labelText(device: Device, source: TwinSource): string {
-  const field = device.fields[0]
-  if (field) {
-    const v = source.value(device.id, field.key)
-    const n = v === null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: field.decimals, maximumFractionDigits: field.decimals })
-    const unit = field.unit && field.unit !== field.short ? ` ${field.unit}` : ''
-    return device.kind === 'sensor' ? `${field.short} ${n}${unit}` : `${device.name} · ${n}${unit}`
-  }
-  if (device.state_field) {
-    const on = source.state(device.id, device.state_field)
-    return `${device.name} · ${on === null ? 'sem dados' : on ? 'ligado' : 'desligado'}`
-  }
-  return device.name
-}
-
-/** Lugar para o que foi cadastrado pela tela e não está no layout. */
-function autoPlacement(device: Device, used: { probe: number; generic: number }): Placement {
-  const slot = device.kind === 'sensor' ? 'probe' : 'generic'
-  const { start, step } = AUTO_SLOTS[slot]
-  const index = used[slot]++
-  const position = start.map((v, axis) => v + step[axis] * index) as Vec3
-  return { model: slot, position }
 }
