@@ -347,7 +347,8 @@ export class MockPlant {
       const vibration =
         1.1 + (mode === 'rolamento' ? 4.5 * progress ** 2 : mode === 'desbalanceamento' ? 3 * progress : 0.3 * progress)
       v[I.vibration] = vibration + noise(0.12)
-      v[I.current] = 2.6 + (mode === 'entupimento' ? 1 : 0.3) * progress + noise(0.04)
+      // Filtro entupido: passa menos água, o motor faz menos força e a corrente cai junto com a vazão (IA-01).
+      v[I.current] = 2.6 + (mode === 'entupimento' ? -0.9 : 0.3) * progress + noise(0.04)
       v[I.flow] = 49 - (mode === 'entupimento' ? 30 : 5) * progress + noise(0.8)
     } else {
       v[I.vibration] = Math.abs(noise(0.02))
