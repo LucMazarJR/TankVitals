@@ -59,6 +59,45 @@ export function controllables(devices: Device[]): Device[] {
   return devices.filter((device) => device.state_field !== null)
 }
 
+// --- Cadastro editável (BACK-06) --------------------------------------------
+
+/**
+ * O que a tela Dispositivos manda ao cadastrar (`POST /api/devices`). O estado,
+ * os comandos e quem manda no dispositivo a API completa pelo tipo: atuador
+ * novo nasce com `on` e controle manual; equipamento, com `running`.
+ */
+export type DeviceInput = Pick<Device, 'id' | 'name' | 'kind' | 'zone' | 'active' | 'fields'>
+
+/**
+ * O que muda ao editar (`PUT /api/devices/{id}`). O id e o tipo não mudam: o id
+ * está nos tópicos MQTT e no histórico, e o tipo decide o que o dispositivo
+ * publica.
+ */
+export type DeviceUpdate = Omit<DeviceInput, 'id' | 'kind'>
+
+/**
+ * Regra automática com dois limites (IOT-07): liga o atuador quando a variável
+ * cai abaixo de `on_below` e desliga quando ela chega a `off_at`. A distância
+ * entre os dois evita o liga-desliga a cada leitura (`GET /api/rules`).
+ */
+export interface Rule {
+  id: string
+  name: string
+  /** A variável vigiada. */
+  device: string
+  field: string
+  /** O atuador que a regra comanda. */
+  actuator: string
+  on_below: number
+  off_at: number
+  /** Última edição; `null` enquanto vale o valor do seed. */
+  updated_at: string | null
+  updated_by: string | null
+}
+
+/** O que a aba de regras edita (`PUT /api/rules/{id}`). */
+export type RuleUpdate = Pick<Rule, 'on_below' | 'off_at'>
+
 // --- Histórico (`GET /api/history`) ----------------------------------------
 
 export interface SeriesStats {
@@ -110,6 +149,20 @@ export interface Alert {
 export interface CommandRequest {
   command: string
   value?: boolean | string
+}
+
+/**
+ * Modos de falha do comando `inject_fault` (IOT-08): o valor vai como texto.
+ * A bomba degrada aos poucos até quebrar; `repair` volta ao estado de nova.
+ */
+export const FAULT_MODES = ['rolamento', 'entupimento', 'superaquecimento', 'desbalanceamento'] as const
+export type FaultMode = (typeof FAULT_MODES)[number]
+
+export const FAULT_LABEL: Record<FaultMode, string> = {
+  rolamento: 'Rolamento gasto',
+  entupimento: 'Filtro entupido',
+  superaquecimento: 'Superaquecimento',
+  desbalanceamento: 'Rotor desbalanceado',
 }
 
 /** A API só confirma que mandou; quem confirma o novo estado é a telemetria. */

@@ -53,6 +53,8 @@ export const PAGES: PageDef[] = [
     title: 'Gêmeo 3D',
     icon: Box,
     group: 'Operação',
+    // O Three.js é pesado: só carrega quando a rota abre.
+    component: () => import('../views/TwinView.vue'),
     task: 'WEB-05 a WEB-08',
     description: 'O tanque em 3D, movido só pelos dados que chegam ao vivo pelo WebSocket.',
   },
@@ -62,6 +64,7 @@ export const PAGES: PageDef[] = [
     title: 'Dispositivos',
     icon: Cpu,
     group: 'Operação',
+    component: () => import('../views/DevicesView.vue'),
     task: 'WEB-03',
     description:
       'Cadastro e gerenciamento dos sensores, dos atuadores e da bomba, com as faixas normais e as regras.',
@@ -122,6 +125,7 @@ export const PAGES: PageDef[] = [
     icon: ScrollText,
     group: 'Sistema',
     permission: 'viewAudit',
+    component: () => import('../views/AuditView.vue'),
     task: 'WEB-04',
     description: 'Logins, comandos e jobs registrados no PostgreSQL.',
   },
@@ -131,6 +135,7 @@ export const PAGES: PageDef[] = [
     title: 'Ferramentas',
     icon: Wrench,
     group: 'Sistema',
+    component: () => import('../views/ToolsView.vue'),
     task: 'WEB-04',
     description: 'Links das interfaces do InfluxDB, do RabbitMQ, do pgAdmin e da documentação da API.',
   },

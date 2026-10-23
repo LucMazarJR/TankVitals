@@ -214,7 +214,7 @@ flowchart TB
 
   *Pronto:* o botão liga a reposição, o estado muda quando a telemetria confirma e o nível sobe.
 
-  *Já existe no front:* `frontend/src/components/ActuatorControl.vue` (estado, botão, "aguardando confirmação", erro e esconder do visualizador), usado no dashboard. Falta o painel do simulador.
+  *Já existe no front:* `frontend/src/components/ActuatorControl.vue` (estado, botão, "aguardando confirmação", erro e esconder do visualizador), usado no dashboard e no painel do 3D, e `frontend/src/components/FaultControl.vue` (o painel do simulador: modo de falha, injetar e reparar), no painel da bomba no 3D. Falta a parte da API e do simulador.
 
 - [ ] **IOT-06 · Bomba com o modelo físico** — depende da IA-01\
   A IA treina com dados gerados por um modelo físico da bomba. Se o simulador
@@ -307,9 +307,11 @@ flowchart TB
   - Criar, editar e desativar dispositivos e faixas (admin).
   - Criar e editar regras, como os limites do aerador (admin).
   - Registrar cada mudança na auditoria.
-  - `GET /api/audit` (admin), paginado e com filtro por tipo e usuário.
+  - `GET /api/audit` (admin), paginado e com filtro por tipo e usuário (formato no contrato do `frontend/README.md`).
 
   *Pronto:* mudar a faixa de um sensor muda a cor no dashboard, sem reiniciar nada.
+
+  *O front já espera:* `POST /api/devices`, `PUT /api/devices/{id}`, `GET /api/rules` e `PUT /api/rules/{id}`, com os formatos no contrato do `frontend/README.md`. A tela (WEB-03) já usa.
 
 - [ ] **BACK-07 · Ollama no Compose**\
   O LLM roda na própria máquina, dentro do compose, sem chave de API e sem nuvem.
@@ -373,7 +375,7 @@ flowchart TB
 
   *Pronto:* tudo atualiza sozinho, sem recarregar a página.
 
-- [ ] **WEB-03 · Tela Dispositivos**\
+- [x] **WEB-03 · Tela Dispositivos**\
   É o cadastro e gerenciamento dos dispositivos que o enunciado exige.
   - Lista dos dispositivos com o estado ao vivo: online ou não, e a última leitura.
   - Formulário (admin) para cadastrar, editar, desativar e ajustar as faixas.
@@ -381,7 +383,9 @@ flowchart TB
 
   *Pronto:* um sensor cadastrado pela tela aparece na lista como "sem dados".
 
-- [ ] **WEB-04 · Auditoria e Ferramentas**\
+  *No front:* `frontend/src/views/DevicesView.vue`, funcionando no modo simulado. As rotas que ela espera da BACK-06 estão no contrato do `frontend/README.md`.
+
+- [x] **WEB-04 · Auditoria e Ferramentas**\
   A auditoria é só para o admin. A página Ferramentas junta os links das
   interfaces que ficam abertas em `127.0.0.1`, como o enunciado pede.
   - Auditoria: tabela com logins, comandos e jobs, com filtro por tipo e usuário.
@@ -389,7 +393,9 @@ flowchart TB
 
   *Pronto:* os links abrem na máquina da demo.
 
-- [ ] **WEB-05 · 3D: cena base**\
+  *No front:* `frontend/src/views/AuditView.vue` e `ToolsView.vue`. A rota `GET /api/audit` que a Auditoria espera está no contrato do `frontend/README.md`; as portas das interfaces, no `frontend/.env.example`.
+
+- [x] **WEB-05 · 3D: cena base**\
   É o gêmeo digital do tanque. Cena simples, de poucos polígonos, serve: o que
   conta é ela estar viva.
   - Three.js puro num componente Vue, sem TresJS, para o loop de animação ficar explícito.
@@ -400,7 +406,7 @@ flowchart TB
 
   *Pronto:* tudo do cadastro aparece na cena, e os tubos encaixam nos bocais.
 
-- [ ] **WEB-06 · 3D: cores e "sem dados"**\
+- [x] **WEB-06 · 3D: cores e "sem dados"**\
   A cena só pode mudar com dado ao vivo, vindo pelo WebSocket.
   - Cor de cada item: normal, atenção, crítico ou sem dados, pela faixa do sensor e pelo alerta da IA. Vale o pior dos dois.
   - Se nada chegar por 10 s, congelar a cena e mostrar "sem dados".
@@ -408,7 +414,7 @@ flowchart TB
 
   *Pronto:* parar o simulador congela a cena com o aviso.
 
-- [ ] **WEB-07 · 3D: animações**\
+- [x] **WEB-07 · 3D: animações**\
   O enunciado pede atuadores animados e pelo menos 2 elementos do ambiente
   reagindo aos dados.
   - Atuadores: bolhas saindo do aerador, jato de água da reposição e partículas nos tubos conforme a vazão.
@@ -418,13 +424,15 @@ flowchart TB
 
   *Pronto:* a falha injetada faz a bomba tremer cada vez mais.
 
-- [ ] **WEB-08 · 3D: painel ao clicar**\
+- [x] **WEB-08 · 3D: painel ao clicar**\
   Clicar num item da cena abre os detalhes dele.
   - Detectar o clique com `Raycaster`.
   - Painel com a última leitura, um mini gráfico e a saúde prevista pela IA.
   - Nos atuadores, os botões da IOT-05.
 
   *Pronto:* clicar na reposição e ligar faz a água subir na cena.
+
+  *No front (WEB-05 a WEB-08):* `frontend/src/views/TwinView.vue` e `frontend/src/scene/`, funcionando no modo simulado. O que cada dado mexe na cena está no `frontend/README.md`.
 
 ---
 
