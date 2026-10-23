@@ -65,6 +65,41 @@
   --scene-murky: #8a7d4f;
   --scene-nodata: #9aa5ad;
 
+  /* Cenários do 3D: céu, paisagem, construções e os peixes de cada um. */
+  --scene-zenith-day: #7db4d4;
+  --scene-zenith-night: #06182a;
+  --scene-horizon-day: #f1e7cf;
+  --scene-horizon-night: #1c3a52;
+  --scene-sun: #fff0c4;
+  --scene-moon: #dfe9f2;
+  --scene-grass: #8db36b;
+  --scene-grass-2: #6e9a52;
+  --scene-hill: #7aa06a;
+  --scene-path: #d9cba8;
+  --scene-trunk: #7a5a3c;
+  --scene-leaf: #4f8a4f;
+  --scene-leaf-2: #78aa5c;
+  --scene-wood: #b98b5a;
+  --scene-wood-dark: #8b6441;
+  --scene-roof: #b5543c;
+  --scene-concrete: #cbc8c1;
+  --scene-paint: #e7b743;
+  --scene-wall: #dde2e2;
+  --scene-steel: #6c7a85;
+  --scene-window: #cfe7f2;
+  --scene-lamp: #fff3d4;
+  --scene-pallet: #c39a64;
+  --scene-sack: #e9ddc1;
+  --scene-room: #1c2b37;
+  --scene-room-floor: #5b4737;
+  --scene-cabinet: #3c2d23;
+  --scene-led: #8fd3ff;
+  --fish-tilapia: #a3afb4;
+  --fish-tilapia-2: #66757d;
+  --fish-tilapia-3: #d4806d;
+  --fish-3: #3d8fd1;
+  --fish-4: #f2d14f;
+
   /* Faixa ideal: na régua dos cartões e no gráfico. */
   --track: #e6e0d3;
   --ideal: #67b78a;
@@ -136,6 +171,40 @@
   --scene-floor: #d6cdb9;
   --scene-murky: #7a6c3c;
   --scene-nodata: #8a959d;
+
+  --scene-zenith-day: #5f9fc6;
+  --scene-zenith-night: #031222;
+  --scene-horizon-day: #eadcbc;
+  --scene-horizon-night: #143049;
+  --scene-sun: #ffe9a8;
+  --scene-moon: #e8f0f7;
+  --scene-grass: #78a356;
+  --scene-grass-2: #5a8740;
+  --scene-hill: #658f55;
+  --scene-path: #cdb98e;
+  --scene-trunk: #694a2e;
+  --scene-leaf: #3c7a3e;
+  --scene-leaf-2: #649a47;
+  --scene-wood: #a8784a;
+  --scene-wood-dark: #775233;
+  --scene-roof: #a2432c;
+  --scene-concrete: #bdb9b0;
+  --scene-paint: #e0a923;
+  --scene-wall: #d2d8d8;
+  --scene-steel: #56646f;
+  --scene-window: #bfe0ef;
+  --scene-lamp: #fff0c8;
+  --scene-pallet: #b3884f;
+  --scene-sack: #e0d1ae;
+  --scene-room: #15222d;
+  --scene-room-floor: #4c3a2c;
+  --scene-cabinet: #31241b;
+  --scene-led: #7ccaff;
+  --fish-tilapia: #95a2a8;
+  --fish-tilapia-2: #55636b;
+  --fish-tilapia-3: #cc6f5a;
+  --fish-3: #2f7fc2;
+  --fish-4: #efc62f;
 
   --track: #d8d0be;
   --ideal: #4aa574;
