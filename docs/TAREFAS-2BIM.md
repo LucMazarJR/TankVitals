@@ -383,7 +383,7 @@ flowchart TB
 
   *Pronto:* um sensor cadastrado pela tela aparece na lista como "sem dados".
 
-  *No front:* `frontend/src/views/DevicesView.vue`, funcionando no modo simulado. As rotas que ela espera da BACK-06 estão no contrato do `frontend/README.md`.
+  *No front:* `frontend/src/views/DevicesView.vue`, funcionando no modo simulado: cartões por tanque com a leitura ao vivo, resumo que filtra, detalhe lateral e o formulário com o id sugerido pela convenção. As rotas que ela espera da BACK-06 estão no contrato do `frontend/README.md`.
 
 - [x] **WEB-04 · Auditoria e Ferramentas**\
   A auditoria é só para o admin. A página Ferramentas junta os links das
@@ -432,7 +432,7 @@ flowchart TB
 
   *Pronto:* clicar na reposição e ligar faz a água subir na cena.
 
-  *No front (WEB-05 a WEB-08):* `frontend/src/views/TwinView.vue` e `frontend/src/scene/`, funcionando no modo simulado. O que cada dado mexe na cena está no `frontend/README.md`.
+  *No front (WEB-05 a WEB-08):* `frontend/src/views/TwinView.vue` e `frontend/src/scene/`, funcionando no modo simulado. Cada zona do cadastro vira um tanque (um sensor cadastrado em `tanque-02` cria o segundo), há três cenários para escolher (piscicultura, galpão e aquário) e clicar num tanque voa até ele e abre as estatísticas do aquário. O que cada dado mexe na cena está no `frontend/README.md`.
 
 ---
 
