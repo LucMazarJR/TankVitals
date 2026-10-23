@@ -39,7 +39,7 @@ export class WarehouseEnvironment implements Environment {
   readonly fish = 'tilapia' as const
   readonly root = new Group()
   readonly keyLight: DirectionalLight
-  readonly view = { overview: new Vector3(4.2, 4.6, 7.8), tank: new Vector3(0.5, 0.48, 1), maxDistance: 38 }
+  readonly view = { overview: new Vector3(4.2, 2.7, 7.8), tank: new Vector3(0.5, 0.48, 1), maxDistance: 38 }
   readonly background = new Color()
   readonly fog = null
   readonly tankGlow = 0.6
