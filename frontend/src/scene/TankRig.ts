@@ -102,7 +102,8 @@ export class TankRig {
   private live = false
   /** Nível da água desenhado agora, em %; anda suave até a leitura. */
   private shownLevel: number | null = null
-  private daylight = 1
+  /** `null` até a primeira leitura: aí vale direto, sem suavizar. */
+  private daylight: number | null = null
 
   constructor(spec: TankSpec, ctx: RigContext) {
     this.id = spec.id
@@ -260,7 +261,7 @@ export class TankRig {
     // A luz do próprio tanque, se ele tiver sensor; senão a do cenário.
     const lux = this.spec.bindings.light ? src.value(this.spec.bindings.light.device, this.spec.bindings.light.field) : null
     const target = lux === null ? daylight : Math.min(1, Math.sqrt(Math.max(0, lux) / 30000))
-    this.daylight += (target - this.daylight) * Math.min(1, dt * 1.5)
+    this.daylight = this.daylight === null ? target : this.daylight + (target - this.daylight) * Math.min(1, dt * 1.5)
 
     if (!this.live) return
     this.t += dt
@@ -390,10 +391,10 @@ export class TankRig {
       material.color.lerp(target, ease)
       material.opacity += (0.42 + 0.4 * murk - material.opacity) * ease
     }
-    const night = (1 - this.daylight) * glow
+    const night = (1 - (this.daylight ?? 1)) * glow
     material.emissive.copy(p['--accent']).multiplyScalar(0.55 * night)
     // A rede de luz no fundo vem do sol (ou da luminária, à noite) passando pela superfície.
-    this.tank.caustics.value = this.tank.surface.visible ? 0.22 * (0.3 + 0.7 * Math.max(this.daylight, night)) : 0
+    this.tank.caustics.value = this.tank.surface.visible ? 0.22 * (0.3 + 0.7 * Math.max(this.daylight ?? 1, night)) : 0
     this.tank.led.color.copy(p['--night']).lerp(p['--scene-led'], Math.min(1, 0.25 + night))
   }
 

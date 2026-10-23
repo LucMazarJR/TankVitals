@@ -96,6 +96,8 @@ export class TwinScene {
   /** Quanto é dia, de 0 (noite) a 1, pela luminosidade lida; anda suave. */
   private daylight = 1
   private targetDaylight = 1
+  /** A primeira leitura de luz vale direto: a cena abre de noite se for noite, sem amanhecer falso. */
+  private daylightKnown = false
 
   // Clique e dica do mouse (WEB-08).
   private readonly raycaster = new Raycaster()
@@ -453,7 +455,14 @@ export class TwinScene {
       }
     }
     // A raiz deixa o amanhecer e o entardecer visíveis, não só o meio-dia.
-    if (readings) this.targetDaylight = Math.min(1, Math.sqrt(Math.max(0, lux / readings) / 30000))
+    if (readings) {
+      this.targetDaylight = Math.min(1, Math.sqrt(Math.max(0, lux / readings) / 30000))
+      if (!this.daylightKnown) {
+        this.daylightKnown = true
+        this.daylight = this.targetDaylight
+        this.env?.update(this.daylight, this.t)
+      }
+    }
 
     // A dica acompanha a leitura enquanto o mouse está parado em cima.
     if (this.hovering) {
