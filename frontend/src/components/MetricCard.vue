@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { Component } from 'vue'
 import type { MetricThreshold, MetricValue } from '../types'
-import { LEVEL_TEXT, safeRangeLabel } from '../alerts'
+import { LEVEL_TEXT, rangeScale, safeRangeLabel } from '../alerts'
 import { LEVEL_ICON, UI_ICON } from '../icons'
 
 const props = defineProps<{
@@ -28,37 +28,8 @@ const valueLabel = computed(() => {
 // A unidade vem da leitura; se ela ainda nao chegou, o card mostra so o valor.
 const safeRange = computed(() => safeRangeLabel(props.threshold, props.unit ?? props.metric?.unit ?? ''))
 
-/**
- * Régua da faixa: a trilha vai um pouco além dos limites críticos, a banda
- * verde é a faixa ideal e o traço é a leitura atual. Em % a régua vai sempre
- * de 0 a 100. Sem os dois limites não há como montar a escala, e a régua some.
- */
-const scale = computed(() => {
-  const t = props.threshold
-  const value = props.metric?.value
-  if (!t || value === undefined || value === null || Number.isNaN(value)) return null
-
-  let min: number
-  let max: number
-  const lo = t.crit_min ?? t.ok_min
-  const hi = t.crit_max ?? t.ok_max
-  if (props.metric?.unit === '%') {
-    min = 0
-    max = 100
-  } else if (lo !== null && hi !== null && hi > lo) {
-    const pad = (hi - lo) * 0.25
-    // Grandeza física que não fica negativa (turbidez) não ganha trilha abaixo de 0.
-    min = lo >= 0 ? Math.max(0, lo - pad) : lo - pad
-    max = hi + pad
-  } else {
-    return null
-  }
-
-  const pos = (x: number) => ((Math.min(max, Math.max(min, x)) - min) / (max - min)) * 100
-  const from = pos(t.ok_min ?? min)
-  const to = pos(t.ok_max ?? max)
-  return { left: `${from}%`, width: `${to - from}%`, at: `${pos(value)}%` }
-})
+// Régua da faixa (a mesma conta dos cartões de Dispositivos e do painel do 3D).
+const scale = computed(() => rangeScale(props.threshold, props.metric?.value, props.metric?.unit ?? props.unit ?? ''))
 </script>
 
 <template>
