@@ -20,6 +20,11 @@ const RECENT_SIZE = 120
 export const useLiveStore = defineStore('live', () => {
   const status = ref<LiveStatus>('off')
   const lastMessageAt = ref<number | null>(null)
+  /**
+   * Última telemetria de qualquer dispositivo. É ela que diz se o simulador
+   * está vivo: alerta e previsão podem continuar chegando com ele parado.
+   */
+  const lastTelemetryAt = ref<number | null>(null)
   /** Última telemetria de cada dispositivo, pelo id do cadastro. */
   const latest = shallowReactive<Record<string, Envelope>>({})
   /** Telemetrias recentes de cada dispositivo, da mais velha para a mais nova. */
@@ -33,6 +38,7 @@ export const useLiveStore = defineStore('live', () => {
   function ingest(msg: Envelope): void {
     lastMessageAt.value = Date.now()
     if (msg.type === 'telemetry') {
+      lastTelemetryAt.value = Date.now()
       latest[msg.device] = msg
       const list = recent[msg.device] ?? []
       recent[msg.device] = [...list.slice(-(RECENT_SIZE - 1)), msg]
@@ -81,6 +87,7 @@ export const useLiveStore = defineStore('live', () => {
   return {
     status,
     lastMessageAt,
+    lastTelemetryAt,
     latest,
     recent,
     insights,

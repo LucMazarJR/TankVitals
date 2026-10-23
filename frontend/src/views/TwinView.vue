@@ -35,13 +35,16 @@ const { level, insight } = useItemLevel(() => alerts.value)
 const { connection } = useDeviceState()
 const { tanks } = useTwinTanks(level)
 
-/** A cena congela se nada chegar por 10 s, de nenhum dispositivo (WEB-06). */
+/**
+ * A cena congela se nenhum dispositivo publicar por 10 s (WEB-06). Conta só a
+ * telemetria: com o simulador parado ainda pode chegar alerta ou previsão.
+ */
 function isFrozen(at: number): boolean {
-  return live.lastMessageAt === null || at - live.lastMessageAt > STALE_AFTER_MS
+  return live.lastTelemetryAt === null || at - live.lastTelemetryAt > STALE_AFTER_MS
 }
 const frozen = computed(() => isFrozen(now.value))
 const silentFor = computed(() =>
-  live.lastMessageAt === null ? null : Math.max(0, Math.round((now.value - live.lastMessageAt) / 1000)),
+  live.lastTelemetryAt === null ? null : Math.max(0, Math.round((now.value - live.lastTelemetryAt) / 1000)),
 )
 
 const LEGEND: ItemLevel[] = ['ok', 'atencao', 'critico', 'vazio']
