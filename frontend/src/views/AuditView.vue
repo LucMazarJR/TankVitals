@@ -33,6 +33,8 @@ const page = ref(1)
 
 const items = ref<AuditEntry[]>([])
 const total = ref(0)
+/** Hora da última busca boa, para o aviso de que a lista se renova sozinha. */
+const loadedAt = ref<Date | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 let request = 0
@@ -50,6 +52,7 @@ async function load(): Promise<void> {
     if (current !== request) return
     items.value = result.items
     total.value = result.total
+    loadedAt.value = new Date()
     error.value = null
   } catch (err) {
     if (current !== request) return
@@ -103,13 +106,45 @@ const rangeText = computed(() => {
   return `${first}–${last} de ${total.value.toLocaleString('pt-BR')}`
 })
 
-function when(entry: AuditEntry): { date: string; ago: string } {
+function when(entry: AuditEntry): { time: string; ago: string } {
   const at = new Date(entry.ts)
   return {
-    date: at.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    time: at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     ago: formatAge(Math.max(0, Math.round((now.value - at.getTime()) / 1000))),
   }
 }
+
+/** "Hoje", "Ontem" ou "21/10, terça": o cabeçalho de cada dia na tabela. */
+function dayLabel(at: Date): string {
+  const today = new Date(now.value)
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((start(today) - start(at)) / 86_400_000)
+  if (days === 0) return 'Hoje'
+  if (days === 1) return 'Ontem'
+  return at.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'long' })
+}
+
+/** As linhas da página agrupadas por dia, na ordem em que vieram (mais novas primeiro). */
+const days = computed(() => {
+  const groups: Array<{ label: string; entries: AuditEntry[] }> = []
+  for (const entry of items.value) {
+    const label = dayLabel(new Date(entry.ts))
+    const last = groups[groups.length - 1]
+    if (last?.label === label) last.entries.push(entry)
+    else groups.push({ label, entries: [entry] })
+  }
+  return groups
+})
+
+/** "operador" → "OP"; "joao.silva" → "JS". */
+function initials(name: string): string {
+  const parts = name.split(/[.\s_-]+/).filter(Boolean)
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase()
+}
+
+const loadedText = computed(() =>
+  loadedAt.value ? loadedAt.value.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null,
+)
 </script>
 
 <template>
@@ -158,6 +193,12 @@ function when(entry: AuditEntry): { date: string; ago: string } {
         </div>
       </div>
 
+      <p v-if="loadedText" class="small-note audit-live">
+        <span class="audit-live-dot" aria-hidden="true" />
+        {{ page === 1 ? 'A primeira página se atualiza sozinha a cada 10 s' : 'Volte à primeira página para ver o que acabou de acontecer' }}
+        · atualizado às {{ loadedText }}
+      </p>
+
       <div v-if="error" class="error-state">
         <component :is="LEVEL_ICON.critico" :size="22" aria-hidden="true" />
         <strong>Não foi possível carregar a auditoria</strong>
@@ -185,20 +226,24 @@ function when(entry: AuditEntry): { date: string; ago: string } {
               <th scope="col">Resultado</th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="entry in items" :key="entry.id" :class="{ 'is-refused': !entry.ok }">
+          <tbody v-for="day in days" :key="day.label">
+            <tr class="audit-day">
+              <th colspan="5" scope="rowgroup">{{ day.label }}</th>
+            </tr>
+            <tr v-for="entry in day.entries" :key="entry.id" :class="{ 'is-refused': !entry.ok }">
               <td class="audit-when">
-                <strong>{{ when(entry).date }}</strong>
+                <strong>{{ when(entry).time }}</strong>
                 <small>{{ when(entry).ago }}</small>
               </td>
               <td>
                 <button type="button" class="user-link" :title="`Só os registros de ${entry.user}`" @click="userText = entry.user">
+                  <span class="avatar" aria-hidden="true">{{ initials(entry.user) }}</span>
                   {{ entry.user }}
                 </button>
               </td>
               <td>
-                <span class="audit-type">
-                  <component :is="TYPE_ICON[entry.type]" :size="15" aria-hidden="true" />
+                <span :class="['audit-type', `type-${entry.type}`]">
+                  <span class="audit-type-icon"><component :is="TYPE_ICON[entry.type]" :size="14" aria-hidden="true" /></span>
                   {{ AUDIT_TYPE_LABEL[entry.type] }}
                 </span>
               </td>
@@ -273,7 +318,7 @@ function when(entry: AuditEntry): { date: string; ago: string } {
 }
 
 .type-filter button.active {
-  color: #ffffff;
+  color: var(--surface);
   border-color: var(--night);
   font-weight: var(--fw-heavy);
   background: var(--night);
@@ -337,6 +382,9 @@ function when(entry: AuditEntry): { date: string; ago: string } {
 }
 
 .user-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 0;
   border: 0;
   color: var(--accent);
@@ -346,15 +394,79 @@ function when(entry: AuditEntry): { date: string; ago: string } {
   background: transparent;
 }
 
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--night-ink);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-heavy);
+  text-decoration: none;
+  background: var(--night);
+}
+
 .audit-type {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   white-space: nowrap;
 }
 
-.audit-type svg {
+.audit-type-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   color: var(--accent);
+  background: var(--surface-2);
+}
+
+.type-login .audit-type-icon {
+  color: var(--accent);
+}
+
+.type-command .audit-type-icon {
+  color: var(--brand-fish);
+}
+
+.type-registry .audit-type-icon {
+  color: var(--plant);
+}
+
+.type-job .audit-type-icon {
+  color: var(--night);
+}
+
+.type-assistant .audit-type-icon {
+  color: var(--fish-3);
+}
+
+/* Cabeçalho de cada dia: separa a tabela sem repetir a data em toda linha. */
+.audit-day th {
+  padding: 14px 10px 6px;
+  border-bottom: var(--bw) solid var(--line);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-heavy);
+  text-transform: capitalize;
+  background: var(--surface);
+}
+
+.audit-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 6px;
+}
+
+.audit-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--nivel-ok);
 }
 
 .audit-what strong {
