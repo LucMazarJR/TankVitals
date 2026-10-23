@@ -278,9 +278,10 @@ export class TankRig {
   bounds(deviceId?: string): Sphere {
     const item = deviceId ? this.items.get(deviceId) : undefined
     if (item) return new Box3().setFromObject(item.model.root).getBoundingSphere(new Sphere())
-    const { width: W, depth: D, height: H } = TANK_3D
-    const center = new Vector3(0.3, H * 0.45, 0).add(this.root.position)
-    return new Sphere(center, Math.hypot(W, H, D) / 2)
+    // O tanque com os equipamentos em volta: a bomba e o filtro também entram no quadro.
+    const { minX, maxX, minZ, maxZ } = this.spec.footprint
+    const center = new Vector3((minX + maxX) / 2, TANK_3D.height * 0.45, (minZ + maxZ) / 2).add(this.root.position)
+    return new Sphere(center, Math.hypot(maxX - minX, maxZ - minZ) / 2)
   }
 
   /** Onde o item está montado (o pé dele), no mundo. */

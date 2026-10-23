@@ -326,7 +326,7 @@ export class TwinScene {
     const rig = this.rigs.get(focus.tank)!
     if (focus.level === 'tank') {
       const sphere = rig.bounds()
-      const distance = 7 * Math.max(1, 1.3 / aspect)
+      const distance = Math.max(6.5, sphere.radius * 1.75) * Math.max(1, 1.3 / aspect)
       return { target: sphere.center, position: sphere.center.clone().addScaledVector(env.view.tank.clone().normalize(), distance) }
     }
 
