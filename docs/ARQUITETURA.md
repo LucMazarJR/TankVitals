@@ -565,3 +565,106 @@ recarrega sem reiniciar, e a tela Treinamento destaca a versão nova.
 O rótulo da simulação (horas até a falha, saúde de verdade e modo de falha) só
 existe nos dados do gerador da IA. Se ele aparecer na telemetria, o modelo
 "cola" na prova ao vivo. A IOT-08 tem um teste automatizado conferindo isso.
+
+---
+
+## 13. MQTT: simulador e gateway
+
+O Mosquitto fica na borda, dentro do compose. Só o simulador e o gateway falam
+com ele, cada um com usuário e senha (PLAT-04). O prefixo de grupo do 1º
+bimestre (§2) sai, porque o broker agora é nosso e não o público.
+
+| Tópico | Publica | Assina | QoS | Retained | Conteúdo |
+| --- | --- | --- | --- | --- | --- |
+| `tankvitals/<zona>/<tipo>/<device>/telemetry` | simulador | gateway | 0 | não | envelope `telemetry` (§12) |
+| `tankvitals/<zona>/<tipo>/<device>/cmd` | gateway | simulador | 1 | não | envelope `command` |
+| `tankvitals/sim/status` | simulador (e o Last Will) | gateway | 1 | sim | envelope `status` |
+
+- `<zona>` é a zona do cadastro (`tanque-01`), `<tipo>` é o `kind` do
+  dispositivo (`sensor`, `equipment` ou `actuator`) e `<device>` é o id (§15).
+  Exemplo: `tankvitals/tanque-01/sensor/od-01/telemetry`.
+- Ids e zonas só têm letras minúsculas, números e hífen (é o que a tela
+  Dispositivos aceita). Nunca ponto nem barra, porque os dois viram separador no
+  MQTT e no RabbitMQ.
+- O gateway assina com curinga: `tankvitals/+/+/+/telemetry` e
+  `tankvitals/sim/status`.
+- A telemetria vai com QoS 0 porque chega uma por segundo e a próxima cobre a
+  perdida. O comando e o status vão com QoS 1, porque não podem se perder.
+- O simulador publica uma mensagem por dispositivo a cada passo. Com
+  `SIM_SPEED=60` (o padrão da IOT-06), 1 s real é 1 min simulado e um dia dura
+  24 min.
+- **Last Will:** o simulador registra `{"online": false}` em
+  `tankvitals/sim/status` ao conectar, e logo depois publica `{"online": true}`
+  retained. Se ele cair sem se despedir, o Mosquitto publica o Last Will
+  sozinho. O `ts` desse envelope é o da conexão, então quem recebe usa a hora de
+  chegada.
+- **ACL:** `simulator` publica em `tankvitals/+/+/+/telemetry` e em
+  `tankvitals/sim/status` e só lê `tankvitals/+/+/+/cmd`; `gateway` faz o
+  contrário. A porta 1883 fica aberta só em `127.0.0.1`.
+
+---
+
+## 14. RabbitMQ: o barramento interno
+
+Toda a estrutura é declarada uma vez, no `definitions.json` carregado quando o
+broker sobe (PLAT-05). Nenhum serviço declara exchange ou fila. Todas as
+mensagens são o envelope da §12 em JSON (`content_type: application/json`), e
+comandos e jobs vão como persistentes.
+
+### 14.1 Exchanges e routing keys
+
+| Exchange | Tipo | Quem publica | Routing key | Exemplo |
+| --- | --- | --- | --- | --- |
+| `tv.telemetry` | topic | gateway | `telemetry.<zona>.<tipo>.<device>` | `telemetry.tanque-01.sensor.od-01` |
+| `tv.telemetry` | topic | gateway | `status.sim` | status do simulador |
+| `tv.commands` | topic | API e `rules` | `command.<zona>.<tipo>.<device>` | `command.tanque-01.actuator.aerador-01` |
+| `tv.insights` | topic | inference | `insight.<device>` | `insight.bomba-rec-01` |
+| `tv.events` | topic | `rules` e inference | `alert.<device>` | alerta que abriu, piorou ou fechou |
+| `tv.events` | topic | worker | `job.<kind>` | `job.datagen`, `job.train` |
+| `tv.events` | topic | worker | `model.updated` | modelo novo em uso |
+| `tv.jobs` | direct | API | `datagen` ou `train` | pedido de job |
+| `tv.dlx` | fanout | o RabbitMQ e o gateway | (qualquer) | mensagem morta |
+
+O gateway monta a routing key com as partes do tópico:
+`tankvitals/<zona>/<tipo>/<device>/telemetry` vira
+`telemetry.<zona>.<tipo>.<device>`. Não é a troca direta de `/` por `.` que a
+IOT-02 sugeria, porque aí a key começaria por `tankvitals.` e terminaria em
+`.telemetry`, e os bindings abaixo não bateriam.
+
+### 14.2 Filas
+
+| Fila | Bindings | Consumidor | Para quê |
+| --- | --- | --- | --- |
+| `q.writer` | `tv.telemetry` `telemetry.#` · `tv.insights` `#` | writer | grava leituras e previsões no InfluxDB (PLAT-06) |
+| `q.ws` | `tv.telemetry` `#` · `tv.insights` `#` · `tv.events` `#` | API | repassa tudo ao WebSocket (BACK-04) |
+| `q.rules` | `tv.telemetry` `telemetry.#` | rules | aerador automático e alertas de faixa (IOT-07) |
+| `q.inference` | `tv.telemetry` `telemetry.*.equipment.*` · `tv.events` `model.updated` | inference | previsão ao vivo e troca de modelo (IA-07) |
+| `q.commands` | `tv.commands` `#` | gateway | publica no `/cmd` do dispositivo (IOT-02) |
+| `q.jobs.datagen` | `tv.jobs` `datagen` | worker | gera os dados sintéticos (IA-02 e IA-03) |
+| `q.jobs.train` | `tv.jobs` `train` | worker | treina os modelos (IA-05) |
+| `q.dlq` | `tv.dlx` | ninguém consome | guarda o que falhou; a página Mensageria lê sem tirar da fila (PLAT-07) |
+
+- Toda fila, menos a `q.dlq`, tem `x-dead-letter-exchange: tv.dlx`. Uma
+  mensagem rejeitada sem devolver (`nack` com `requeue=false`) cai na DLQ.
+- O gateway publica direto em `tv.dlx` a mensagem MQTT inválida, com o corpo
+  original intacto e o motivo no header `x-reason` (IOT-02).
+- O ack sempre vem depois do trabalho feito: o writer confirma depois de gravar
+  e o gateway depois de publicar no MQTT.
+
+### 14.3 Usuários
+
+Um usuário por serviço, sem `guest`. As senhas saem do `scripts/gerar_segredos.py`
+(PLAT-02).
+
+| Usuário | Lê | Escreve |
+| --- | --- | --- |
+| `gateway` | `q.commands` | `tv.telemetry`, `tv.dlx` |
+| `writer` | `q.writer` | (nada) |
+| `rules` | `q.rules` | `tv.commands`, `tv.events` |
+| `inference` | `q.inference` | `tv.insights`, `tv.events` |
+| `worker` | `q.jobs.datagen`, `q.jobs.train` | `tv.events` |
+| `api` | `q.ws` | `tv.commands`, `tv.jobs` |
+
+O usuário `api` tem também a tag `monitoring`, para consultar a API de
+gerenciamento do RabbitMQ (`/api/queues`, `/api/overview`, `/api/consumers`) e
+montar a página Mensageria.
