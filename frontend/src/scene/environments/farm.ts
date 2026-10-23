@@ -47,7 +47,7 @@ export class FarmEnvironment implements Environment {
   readonly fish = 'tilapia' as const
   readonly root = new Group()
   readonly keyLight: DirectionalLight
-  readonly view = { overview: new Vector3(5.3, 3.4, 6.9), tank: new Vector3(0.5, 0.42, 1), maxDistance: 48 }
+  readonly view = { overview: new Vector3(5.3, 2.5, 6.9), tank: new Vector3(0.5, 0.42, 1), maxDistance: 48 }
   readonly background = new Color()
   readonly fog = new Fog(new Color(), 30, 160)
   readonly tankGlow = 0.8
@@ -85,7 +85,7 @@ export class FarmEnvironment implements Environment {
 
     const groundY = (x: number, z: number) => {
       const d = outside(bounds, x, z)
-      return GROUND_Y + MathUtils.smoothstep(d, 16, 60) * (5 + 4 * softNoise(x * 0.5, z * 0.5))
+      return GROUND_Y + MathUtils.smoothstep(d, 24, 75) * (3 + 3 * softNoise(x * 0.5, z * 0.5))
     }
     this.root.add(this.buildGround(bounds, groundY))
     this.root.add(this.buildDecks(ctx.slots, ctx.footprints))
