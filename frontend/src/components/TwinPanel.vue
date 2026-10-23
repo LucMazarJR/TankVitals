@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import { X } from 'lucide-vue-next'
 import { classify, healthLevel, LEVEL_TEXT } from '../alerts'
 import { formatAge, useDeviceState } from '../composables/useDeviceState'
 import { ITEM_LEVEL_TEXT, type ItemLevel } from '../composables/useItemLevel'
@@ -76,8 +75,8 @@ const canFault = computed(() => props.device.commands.includes('inject_fault'))
         <h3 :id="`item-${uid}`">{{ device.name }}</h3>
         <span>{{ KIND_LABEL[device.kind] }} · <code>{{ device.id }}</code></span>
       </div>
-      <button type="button" class="dialog-close" aria-label="Fechar o painel" @click="emit('close')">
-        <X :size="18" aria-hidden="true" />
+      <button type="button" class="dialog-close" aria-label="Voltar para o tanque" @click="emit('close')">
+        <component :is="UI_ICON.voltar" :size="18" aria-hidden="true" />
       </button>
     </header>
 
