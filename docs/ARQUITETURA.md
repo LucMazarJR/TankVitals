@@ -754,3 +754,89 @@ os nomes que viram JSON nas rotas (§17) têm que bater.
 
 O estado vai como 0 e 1 para dar para somar: é assim que o histórico calcula o
 tempo ligado (`on_s`) e quantas vezes ligou (`turn_ons`).
+
+---
+
+## 17. API: rotas, login e WebSocket
+
+O navegador só fala com a API, sempre por caminho relativo (`/api` e `/ws`): o
+nginx do frontend, na porta 8080, repassa para a API, que não publica porta
+(PLAT-08). Tudo é JSON, com datas em ISO 8601 UTC.
+
+### 17.1 Login, papéis e erros
+
+- **Login:** `POST /api/auth/login` recebe um formulário
+  (`x-www-form-urlencoded`, o mesmo do "Authorize" do `/api/docs`) com
+  `username` e `password` e devolve `{access_token, token_type: "bearer"}`.
+- **Token:** é um JWT de 30 min (BACK-03). O front lê do token as claims
+  `sub` (o usuário), `role` e `exp`, e manda o token em
+  `Authorization: Bearer <token>`.
+- **Papéis:** o visualizador (`viewer`) só vê. O operador (`operator`) também
+  comanda os atuadores e o simulador. O admin (`admin`) também edita o
+  cadastro e as regras, gera dados, treina e vê a auditoria. Quem barra é a
+  API; a tela só esconde o botão.
+- **Erros** vêm como `{"detail": "mensagem em português"}`, e a tela mostra o
+  `detail` como está. O 422 de validação do próprio FastAPI, que vem em lista,
+  também é aceito.
+
+| Código | Quando |
+| --- | --- |
+| 401 | sem token ou token vencido; o front volta para o login |
+| 403 | o papel não pode fazer aquilo |
+| 404 | dispositivo, regra ou job que não existe |
+| 409 | id repetido no cadastro |
+| 422 | corpo inválido, como faixa trocada ou `off_at` menor que `on_below` |
+| 429 | 6ª senha errada seguida (bloqueia 5 min) ou mais de 5 perguntas por minuto ao assistente |
+
+### 17.2 WebSocket
+
+1. Com o JWT, o front pede `POST /api/ws/ticket` e recebe `{ticket}`. O ticket
+   vale 30 s e uma vez só (BACK-04).
+2. Abre `WS /ws/live?ticket=...`. O JWT nunca vai na URL, porque URL acaba em
+   log de proxy e no histórico do navegador.
+3. Recebe um envelope da §12 por mensagem: telemetria, previsões, alertas,
+   progresso de job, modelo novo e status do simulador.
+4. Se a conexão cair, pede outro ticket e reconecta, esperando de 1 s até
+   30 s entre as tentativas.
+
+### 17.3 Rotas que o front já usa
+
+O modo simulado (`frontend/src/mock/`) responde exatamente nestes formatos, e
+os tipos estão em `frontend/src/domain/devices.ts` e `frontend/src/domain/audit.ts`.
+
+| Rota | Papel | O que o front espera | Tarefa |
+| --- | --- | --- | --- |
+| `POST /api/auth/login` | (sem login) | formulário `username` e `password`; devolve `{access_token, token_type}` | BACK-03 |
+| `POST /api/ws/ticket` | todos | `{ticket}`, de uso único | BACK-04 |
+| `GET /api/devices` | todos | `[{id, name, kind, zone, active, fields, state_field, commands, control}]`, cada campo com `key, label, short, unit, decimals, range`, e `range` com `ok_min, ok_max, crit_min, crit_max`. Vêm também os desativados | BACK-05 |
+| `POST /api/devices` | admin | corpo `{id, name, kind, zone, active, fields}`; a API completa `state_field`, `commands` e `control` pelo tipo e devolve o dispositivo | BACK-06 |
+| `PUT /api/devices/{id}` | admin | corpo `{name, zone, active, fields}` (o id e o tipo não mudam); devolve o dispositivo | BACK-06 |
+| `GET /api/rules` | todos | `[{id, name, device, field, actuator, on_below, off_at, updated_at, updated_by}]` | BACK-06 |
+| `PUT /api/rules/{id}` | admin | corpo `{on_below, off_at}`, com `off_at > on_below`; devolve a regra | BACK-06 |
+| `GET /api/history?range=6h` | todos | `{range, from, to, step_s, series}`; cada série com `device, field, points` (uns 360 `{t, v}`) e `stats` (`count, min, max, avg, last, out_of_range_s`; nos campos de estado, `on_s` e `turn_ons`). `&device=od-01` filtra e pode repetir | BACK-05 |
+| `GET /api/insights/history?range=6h` | todos | o mesmo formato do `/api/history`, com as séries `health` e `rul_h` de cada equipamento, tiradas do measurement `insight`. `&device=bomba-rec-01` filtra | IA-09 |
+| `GET /api/alerts?status=all` | todos | `[{id, device, field, level, message, value, opened_at, closed_at}]`, os mais novos primeiro. `status=open` traz só os abertos | BACK-05 |
+| `GET /api/audit?page=1&page_size=25` | admin | `{items, total, page, page_size}`, os mais novos primeiro; cada item `{id, ts, user, type, action, target, detail, ok}`. `&type=login` e `&user=admin` filtram | BACK-06 |
+| `POST /api/devices/{id}/command` | operator | corpo `{command: "on", value: true}` (ou `inject_fault` com o modo, ou `repair`); devolve `{id, status: "sent"}`. O estado novo chega pela telemetria | IOT-04 |
+
+- **Períodos do histórico:** `range` aceita `1h`, `6h`, `24h` e `7d`.
+- **Estatísticas sobre as leituras cruas:** elas são calculadas sobre as
+  leituras de verdade, não sobre os pontos agregados do gráfico. É delas que
+  saem o "tempo fora da faixa" e o "quantas vezes o aerador ligou" do dashboard.
+
+### 17.4 Rotas das telas que ainda vão nascer
+
+Só o nome e para que servem. Quem fizer a tela detalha o formato aqui antes de
+começar.
+
+| Rota | Papel | Para quê | Tarefa |
+| --- | --- | --- | --- |
+| `GET /api/health` | (sem login) | estado da API e das dependências, para o healthcheck do compose | PLAT-03 |
+| `GET /api/messaging` | todos | filas, taxas, consumidores, últimas 50 mensagens da `q.ws` e amostra da DLQ | PLAT-07 |
+| `POST /api/lab/jobs` | admin | pede a geração de dados com os parâmetros; responde na hora com o id do job | IA-03 |
+| `GET /api/lab/jobs` | todos | jobs de geração, com estado e progresso | IA-03 |
+| `GET /api/lab/datasets` | todos | datasets gerados, com tamanho e parâmetros | IA-03 |
+| `POST /api/models/train` | admin | dispara o treino pela fila `q.jobs.train` | IA-05 |
+| `GET /api/models` | todos | versões dos modelos, com as métricas, a base de comparação e qual está em uso | IA-06 |
+| `POST /api/assistant` | todos | pergunta ao assistente; a resposta vem em streaming | BACK-09 |
+| `GET /api/assistant/status` | todos | se o modelo do Ollama já está carregado | BACK-09 |
