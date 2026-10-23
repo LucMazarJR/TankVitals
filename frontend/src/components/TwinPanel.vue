@@ -5,10 +5,10 @@ import { classify, healthLevel, LEVEL_TEXT } from '../alerts'
 import { formatAge, useDeviceState } from '../composables/useDeviceState'
 import { ITEM_LEVEL_TEXT, type ItemLevel } from '../composables/useItemLevel'
 import { useLiveValues } from '../composables/useLiveValues'
+import { useRecentSeries } from '../composables/useRecentSeries'
 import type { Device } from '../domain/devices'
 import { KIND_LABEL } from '../domain/registry'
 import { KIND_ICON, LEVEL_ICON, UI_ICON } from '../icons'
-import { useLiveStore } from '../stores/live'
 import ActuatorControl from './ActuatorControl.vue'
 import FaultControl from './FaultControl.vue'
 import Sparkline from './Sparkline.vue'
@@ -28,7 +28,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const uid = useId()
-const live = useLiveStore()
+const { recentSeries } = useRecentSeries()
 const { value, state } = useLiveValues()
 const { ageSeconds } = useDeviceState()
 
@@ -55,16 +55,8 @@ const age = computed(() => {
   return seconds === null ? 'nunca recebida' : `recebida ${formatAge(seconds)}`
 })
 
-/** As leituras ao vivo guardadas no store (as últimas 120 mensagens). */
-function recent(key: string, isState = false): number[] {
-  const out: number[] = []
-  for (const msg of live.recent[props.device.id] ?? []) {
-    const raw = msg.payload[key]
-    if (isState && typeof raw === 'boolean') out.push(raw ? 1 : 0)
-    else if (typeof raw === 'number') out.push(raw)
-  }
-  return out
-}
+// As leituras ao vivo guardadas no store (as últimas 120 mensagens).
+const recent = (key: string, isState = false) => recentSeries(props.device.id, key, isState)
 
 const health = computed(() => {
   if (!props.insight) return null
