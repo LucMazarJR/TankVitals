@@ -315,8 +315,9 @@ export class TwinScene {
 
     if (focus.level === 'overview') {
       const sphere = this.allBounds()
-      const distance = Math.max(9, sphere.radius * 2.15) * Math.max(1, 1.35 / aspect)
-      const target = sphere.center.clone().setY(1)
+      // Longe o bastante para mostrar o cenário em volta, não só os tanques.
+      const distance = Math.max(13, sphere.radius * 3) * Math.max(1, 1.35 / aspect)
+      const target = sphere.center.clone().setY(1.4)
       return { target, position: target.clone().addScaledVector(env.view.overview.clone().normalize(), distance) }
     }
 
@@ -372,15 +373,17 @@ export class TwinScene {
   private updateSelection(focus: TwinFocus): void {
     this.clearSelection()
     if (focus.level !== 'item') return
-    const sphere = this.rigs.get(focus.tank)!.bounds(focus.device)
+    const rig = this.rigs.get(focus.tank)!
+    const sphere = rig.bounds(focus.device)
+    const base = rig.itemBase(focus.device) ?? sphere.center
     const radius = Math.max(0.28, Math.min(1.1, sphere.radius * 0.85))
     const ring = new Mesh(
       new RingGeometry(radius, radius + 0.05, 48),
       new MeshBasicMaterial({ color: this.palette['--accent'], toneMapped: false, transparent: true, opacity: 0.9, depthWrite: false }),
     )
     ring.rotation.x = -Math.PI / 2
-    ring.position.copy(sphere.center)
-    ring.position.y = sphere.center.y - sphere.radius * 0.55
+    // No pé do item, um pouco acima do piso (ou da borda do tanque, nas sondas).
+    ring.position.set(sphere.center.x, base.y + 0.03, sphere.center.z)
     ring.renderOrder = 5
     this.selection = ring
     this.scene.add(ring)

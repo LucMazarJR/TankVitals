@@ -282,6 +282,12 @@ export class TankRig {
     return new Sphere(center, Math.hypot(W, H, D) / 2)
   }
 
+  /** Onde o item está montado (o pé dele), no mundo. */
+  itemBase(deviceId: string): Vector3 | null {
+    const item = this.items.get(deviceId)
+    return item ? item.model.root.getWorldPosition(new Vector3()) : null
+  }
+
   hasItem(deviceId: string): boolean {
     return this.items.has(deviceId)
   }
