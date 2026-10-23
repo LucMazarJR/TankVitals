@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, useId } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, useId, watch } from 'vue'
 import { Plus, Trash2, X } from 'lucide-vue-next'
 import { createDevice, updateDevice } from '../api/devices'
 import { ApiError } from '../api/http'
@@ -12,6 +12,8 @@ import {
   validateDevice,
   validateRange,
 } from '../domain/registry'
+import { KIND_ICON } from '../icons'
+import { suggestId } from '../plant/roles'
 import type { MetricThreshold } from '../types'
 
 /**
@@ -125,6 +127,37 @@ function issue(path: string): string | undefined {
   return showIssues.value ? issues.value[path] : undefined
 }
 
+/**
+ * A régua da faixa enquanto se digita: crítico, atenção e normal, na
+ * proporção dos limites. Só aparece com a faixa válida.
+ */
+function rangeBands(field: FieldDraft): Array<{ level: 'ok' | 'atencao' | 'critico'; width: string }> | null {
+  const range = rangeOf(field)
+  if (!range || validateRange(range)) return null
+  const { crit_min, ok_min, ok_max, crit_max } = range
+  const values = [crit_min, ok_min, ok_max, crit_max].filter((v): v is number => v !== null)
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const pad = hi > lo ? (hi - lo) * 0.25 : Math.max(1, Math.abs(hi) * 0.25)
+  const min = lo >= 0 ? Math.max(0, lo - pad) : lo - pad
+  const max = hi + pad
+  const stops: Array<[number, 'ok' | 'atencao' | 'critico']> = []
+  // Cada trecho vai até o próximo limite, com o nível que a regra do alerta daria.
+  if (crit_min !== null) stops.push([crit_min, 'critico'])
+  if (ok_min !== null) stops.push([ok_min, 'atencao'])
+  stops.push([ok_max ?? max, 'ok'])
+  if (ok_max !== null) stops.push([crit_max ?? max, 'atencao'])
+  if (crit_max !== null) stops.push([max, 'critico'])
+  let from = min
+  return stops
+    .map(([to, level]) => {
+      const width = ((Math.max(from, Math.min(max, to)) - from) / (max - min)) * 100
+      from = Math.max(from, Math.min(max, to))
+      return { level, width: `${width}%` }
+    })
+    .filter((band) => band.width !== '0%')
+}
+
 /** A faixa em palavras enquanto se digita, ou o que está errado nela. */
 function rangePreview(field: FieldDraft, unit: string): { ok: boolean; text: string } {
   const range = rangeOf(field)
@@ -178,6 +211,28 @@ function saveErrorMessage(err: unknown): string {
 
 const KINDS: DeviceKind[] = ['sensor', 'equipment', 'actuator']
 
+const KIND_HINT: Record<DeviceKind, string> = {
+  sensor: 'Mede uma ou mais variáveis da água.',
+  equipment: 'Máquina que desgasta; a IA acompanha a saúde.',
+  actuator: 'Liga e desliga; manual ou por regra.',
+}
+
+/** As zonas que já existem: escolher uma põe o item naquele tanque. */
+const zones = computed(() => [...new Set(props.devices.map((device) => device.zone))].sort())
+
+// No cadastro novo, o id segue a convenção (od-02, ph-03) até a pessoa mexer nele.
+const idTouched = ref(!isNew)
+const suggestedId = computed(() =>
+  suggestId(draft.fields[0]?.key.trim() ?? '', draft.kind, draft.name, props.devices.map((device) => device.id)),
+)
+watch(
+  suggestedId,
+  (id) => {
+    if (!idTouched.value) draft.id = id
+  },
+  { immediate: true },
+)
+
 onMounted(() => dialog.value?.showModal())
 </script>
 
@@ -213,11 +268,16 @@ onMounted(() => dialog.value?.showModal())
               autocomplete="off"
               spellcheck="false"
               :disabled="!isNew"
+              @input="idTouched = draft.id !== ''"
               :aria-invalid="Boolean(issue('id'))"
             />
             <span v-if="issue('id')" class="form-error">{{ issue('id') }}</span>
             <span v-else class="form-hint">
-              {{ isNew ? 'Vai nos tópicos MQTT e no histórico; não muda depois.' : 'Não muda: está nos tópicos e no histórico.' }}
+              {{
+                isNew
+                  ? 'Sugerido pela convenção (od-02, ph-03): o 3D usa o prefixo para pôr o item no lugar. Não muda depois.'
+                  : 'Não muda: está nos tópicos e no histórico.'
+              }}
             </span>
           </label>
 
@@ -228,17 +288,24 @@ onMounted(() => dialog.value?.showModal())
               name="zone"
               autocomplete="off"
               spellcheck="false"
+              :list="`zonas-${uid}`"
               :aria-invalid="Boolean(issue('zone'))"
             />
+            <datalist :id="`zonas-${uid}`">
+              <option v-for="zone in zones" :key="zone" :value="zone" />
+            </datalist>
             <span v-if="issue('zone')" class="form-error">{{ issue('zone') }}</span>
+            <span v-else class="form-hint">É o tanque. Uma zona nova, como tanque-02, cria outro tanque no 3D.</span>
           </label>
 
           <fieldset class="form-field kind-field span-2">
             <legend>Tipo</legend>
-            <div v-if="isNew" class="kind-options">
-              <label v-for="kind in KINDS" :key="kind">
-                <input v-model="draft.kind" type="radio" name="kind" :value="kind" />
-                <span>{{ KIND_LABEL[kind] }}</span>
+            <div v-if="isNew" class="kind-cards">
+              <label v-for="kind in KINDS" :key="kind" class="kind-card">
+                <input v-model="draft.kind" type="radio" name="kind" :value="kind" class="sr-only" />
+                <component :is="KIND_ICON[kind]" :size="20" aria-hidden="true" />
+                <strong>{{ KIND_LABEL[kind] }}</strong>
+                <small>{{ KIND_HINT[kind] }}</small>
               </label>
             </div>
             <strong v-else class="kind-fixed">{{ KIND_LABEL[draft.kind] }}</strong>
@@ -332,6 +399,9 @@ onMounted(() => dialog.value?.showModal())
                   <input v-model="field.critMax" inputmode="decimal" autocomplete="off" :aria-invalid="Boolean(issue(`fields.${index}.range`))" />
                 </label>
               </div>
+              <div v-if="rangeBands(field)" class="range-bar" aria-hidden="true">
+                <span v-for="(band, i) in rangeBands(field)" :key="i" :class="`band-${band.level}`" :style="{ width: band.width }" />
+              </div>
               <p :class="rangePreview(field, field.unit).ok ? 'form-hint range-preview' : 'form-error range-preview'">
                 {{ rangePreview(field, field.unit).text }}
               </p>
@@ -372,6 +442,76 @@ onMounted(() => dialog.value?.showModal())
 </template>
 
 <style scoped>
+.kind-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.kind-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: var(--bw-strong) solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.kind-card svg {
+  color: var(--accent);
+}
+
+.kind-card small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.kind-card:hover {
+  border-color: var(--accent);
+}
+
+.kind-card:has(input:checked) {
+  border-color: var(--night);
+  box-shadow: inset 0 0 0 1px var(--night);
+  background: var(--surface-2);
+}
+
+.kind-card:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.range-bar {
+  display: flex;
+  height: 10px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.band-ok {
+  background: var(--nivel-ok);
+}
+
+.band-atencao {
+  background: var(--nivel-atencao);
+}
+
+.band-critico {
+  background: var(--nivel-critico);
+}
+
+@media (max-width: 620px) {
+  .kind-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -394,48 +534,6 @@ onMounted(() => dialog.value?.showModal())
 }
 
 /* Rádio no lugar (teclado e leitor de tela); só o desenho vira botão. */
-.kind-options {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: var(--bw) solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-}
-
-.kind-options label {
-  position: relative;
-  flex: 1;
-}
-
-.kind-options input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.kind-options span {
-  display: grid;
-  place-items: center;
-  min-height: 38px;
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: var(--fw-bold);
-}
-
-.kind-options input:checked + span {
-  color: #ffffff;
-  background: var(--night);
-}
-
-.kind-options input:focus-visible + span {
-  outline: 3px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .kind-fixed {
   color: var(--ink);
   font-size: 0.9375rem;

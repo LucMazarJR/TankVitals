@@ -64,6 +64,31 @@ export const ROLE_MODEL: Record<Role, ModelKind> = {
   generic: 'generic',
 }
 
+/**
+ * Um id novo seguindo a convenção: o prefixo do papel e o próximo número livre
+ * (`od-02`, `ph-03`). Com ele o item já entra no lugar certo do 3D.
+ */
+export function suggestId(fieldKey: string, kind: Device['kind'], name: string, taken: string[]): string {
+  const role = BY_FIELD.get(fieldKey) ?? (kind === 'equipment' && (fieldKey === 'vibration_mm_s' || fieldKey === 'flow_l_min') ? 'recirculation' : null)
+  const prefix = BY_PREFIX.find(([, r]) => r === role)?.[0] ?? slug(name)
+  if (!prefix) return ''
+  for (let n = 1; n < 100; n += 1) {
+    const id = `${prefix}-${String(n).padStart(2, '0')}`
+    if (!taken.includes(id)) return id
+  }
+  return prefix
+}
+
+function slug(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24)
+}
+
 export function resolveRole(device: Device): Role {
   // "od" não pode pegar "odometro-01": o prefixo tem que fechar num hífen.
   for (const [prefix, role] of BY_PREFIX) {
