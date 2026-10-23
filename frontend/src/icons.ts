@@ -26,6 +26,9 @@ import {
   ChevronRight,
   ExternalLink,
   Layers,
+  Plus,
+  X,
+  Search,
 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import type { DeviceKind } from './domain/devices'
@@ -81,6 +84,9 @@ export const UI_ICON = {
   abrir: ChevronRight,
   link: ExternalLink,
   cenario: Layers,
+  novo: Plus,
+  fechar: X,
+  buscar: Search,
 }
 
 /** Ícone do tipo de dispositivo, para a lista do cadastro e o painel do 3D. */
