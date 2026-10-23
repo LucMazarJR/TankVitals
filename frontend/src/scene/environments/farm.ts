@@ -106,7 +106,8 @@ export class FarmEnvironment implements Environment {
     this.keyLight.shadow.normalBias = 0.02
     this.keyLight.target.position.copy(this.center)
     // A luz dos postes, uma só para todos: acende à noite.
-    this.lamp = new PointLight(p['--scene-lamp'], 0, 0, 1.6)
+    // Alcance curto: ilumina os decks, não a paisagem inteira.
+    this.lamp = new PointLight(p['--scene-lamp'], 0, 22, 2)
     this.lamp.position.set(this.center.x, 4.5, this.center.z + 1)
     this.root.add(this.hemi, this.keyLight, this.keyLight.target, this.lamp)
   }
@@ -120,15 +121,16 @@ export class FarmEnvironment implements Environment {
 
     this.keyLight.position.copy(this.keyLight.target.position).addScaledVector(this.sky.lightDir, 40)
     this.keyLight.color.copy(p['--scene-moon']).lerp(p['--scene-sun'], daylight)
-    this.keyLight.intensity = 0.35 + 2.3 * daylight
+    this.keyLight.intensity = 0.22 + 2.4 * daylight
     this.hemi.color.copy(this.sky.horizon)
-    this.hemi.groundColor.copy(p['--scene-grass-2']).multiplyScalar(0.4 + 0.6 * daylight)
-    this.hemi.intensity = 0.4 + 0.9 * daylight
+    this.hemi.groundColor.copy(p['--scene-grass-2']).multiplyScalar(0.3 + 0.7 * daylight)
+    // Noite de verdade: quase só a lua e os postes.
+    this.hemi.intensity = 0.16 + 1.14 * daylight
 
     const lit = MathUtils.smoothstep(night, 0.45, 0.8)
     this.bulbs.color.copy(p['--scene-steel']).lerp(p['--scene-lamp'], lit)
     this.windows.color.copy(p['--scene-window']).multiplyScalar(0.55 + 0.45 * daylight).lerp(p['--scene-lamp'], lit)
-    this.lamp.intensity = 28 * lit
+    this.lamp.intensity = 60 * lit
     this.cloudMaterial.color.copy(p['--surface']).lerp(p['--scene-horizon-night'], night * 0.85)
     this.clouds.rotation.y = t * 0.004
   }
