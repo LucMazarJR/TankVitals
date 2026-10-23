@@ -551,7 +551,7 @@ async function toggleActive(device: Device) {
 }
 
 .tank-section-head > div {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 0;
 }
 
@@ -574,7 +574,13 @@ async function toggleActive(device: Device) {
 .device-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-auto-flow: dense;
   gap: 14px;
+}
+
+/* O equipamento ocupa a linha toda, com as variáveis lado a lado; os outros cartões preenchem os buracos. */
+.device-grid .wide {
+  grid-column: 1 / -1;
 }
 
 .empty {
@@ -594,12 +600,6 @@ async function toggleActive(device: Device) {
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-@media (min-width: 900px) {
-  .device-grid .wide {
-    grid-column: span 2;
-  }
 }
 
 @media (max-width: 900px) {

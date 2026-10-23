@@ -316,7 +316,7 @@ const levelIcon = computed(() => (props.level === 'vazio' ? UI_ICON.semDado : LE
 
 .card-vars {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 
