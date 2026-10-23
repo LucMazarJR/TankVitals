@@ -39,6 +39,11 @@ histórico, os alertas e os comandos; a regra do aerador, a reposição, a
 recirculação e a falha injetada funcionam. Dá para testar o fluxo Web → IoT
 inteiro sem backend.
 
+Ela também faz o papel da IA: a cada 5 s sai uma previsão de saúde e vida útil
+da bomba, que percebe a falha injetada aos poucos, e o alerta da IA abre e
+fecha com a histerese da IA-08 (3 previsões ruins seguidas abrem, 10 boas
+fecham). Não é modelo nenhum, é só o formato certo para as telas.
+
 O que se cadastra pela tela (dispositivos, regras) e o log da auditoria ficam
 no `sessionStorage` da aba: recarregar a página mantém, fechar a aba volta ao
 início.
@@ -73,6 +78,11 @@ Quando o backend tiver as rotas do contrato abaixo, ponha `VITE_MOCK=false` no
 | `src/views/AuditView.vue` | a Auditoria (WEB-04), só admin: agrupada por dia, filtro por tipo e usuário, paginada |
 | `src/views/ToolsView.vue` | as Ferramentas (WEB-04): links do InfluxDB, RabbitMQ, pgAdmin e da documentação da API |
 | `src/mock/audit.ts` | a auditoria do modo simulado: 3 dias inventados e o que a pessoa faz no navegador |
+| `src/views/InsightsView.vue` | a Insights (IA-09): resumo e um bloco por equipamento |
+| `src/components/EquipmentInsight.vue` | o bloco de um equipamento: semáforo, tendência da saúde e da vida útil, sinais e alertas |
+| `src/components/HealthLight.vue` | o semáforo da saúde prevista |
+| `src/domain/insights.ts` | as faixas da saúde e da vida útil e o que cada alerta significa e pede para fazer |
+| `src/api/insights.ts` | o histórico das previsões (`GET /api/insights/history`) |
 
 **Para fazer uma tela:** crie a view em `src/views/` e aponte o `component` dela
 em `src/router/pages.ts`. Enquanto ela não existe, a rota mostra um placeholder
@@ -238,6 +248,30 @@ sem dados). O resumo do topo também filtra, e cada tanque tem o link para vê-l
 no 3D. Clicar num cartão abre o detalhe pela direita, onde o admin edita e
 desativa. No cadastro, o id é sugerido pela convenção dos prefixos e a zona
 lista as que já existem: uma zona nova cria outro tanque.
+
+## Insights (IA-09)
+
+Um bloco por equipamento do cadastro (hoje só a bomba de recirculação), com:
+
+- o **semáforo** e os números da última previsão: saúde em %, vida útil em
+  horas ("168 h ou mais" no teto) e uma frase do que fazer. Previsão com mais
+  de 60 s apaga o semáforo, como no 3D;
+- a **tendência** da saúde e da vida útil no período (1 h, 6 h, 24 h ou 7 dias),
+  com as faixas de 70 % e 24 h desenhadas;
+- os **sinais nas leituras**: as quatro variáveis com mini gráfico e, para cada
+  uma fora da faixa, o que costuma ser e o que conferir, pelos modos de falha
+  da IA-01. É uma pista da faixa, não do modelo, e a tela diz isso;
+- os **alertas** abertos do equipamento, da IA e das faixas, cada um com o que
+  significa e o que fazer, e os fechados recentes.
+
+A previsão é a mesma do store que pinta a bomba no 3D, então as duas telas
+mudam juntas. O painel da bomba no 3D e o detalhe em Dispositivos têm o link
+"Ver na Insights", que abre a página já no bloco do equipamento
+(`/insights#bomba-rec-01`).
+
+**Para ver na apresentação:** no 3D, abra a bomba, injete a falha e vá para a
+Insights. Em uns 2,5 min o semáforo passa a amarelo, em uns 3 min a vermelho e
+o alerta da IA abre; reparar fecha o alerta em menos de 1 min.
 
 ## Página Ferramentas
 

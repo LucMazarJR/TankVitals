@@ -523,6 +523,8 @@ flowchart TB
 
   *Pronto:* a falha injetada abre um alerta só, e o reparo fecha.
 
+  *No modo simulado do front:* `frontend/src/mock/plant.ts` já imita essa regra, com o alerta da IA de `field: null`, para a Insights, o dashboard e o 3D terem o que mostrar.
+
 - [ ] **IA-09 · Tela Insights**\
   É o resumo da IA para o usuário, por equipamento.
   - Saúde em semáforo (verde, amarelo, vermelho) e vida útil restante em horas.
@@ -532,3 +534,5 @@ flowchart TB
   - Se a WEB adiantar, pode pegar esta tela.
 
   *Pronto:* durante a falha injetada, a Insights e o 3D mudam juntos.
+
+  *Já existe no front:* `frontend/src/views/InsightsView.vue`, funcionando no modo simulado: semáforo, saúde e vida útil, tendência pelo `GET /api/insights/history` (formato na §17 do `docs/ARQUITETURA.md`), sinais das leituras e alertas com o que fazer. Falta o modelo de verdade (IA-07) e a rota do histórico.
