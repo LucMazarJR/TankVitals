@@ -203,57 +203,6 @@ async function onSaved(device: Device, isNew: boolean) {
 </template>
 
 <style scoped>
-/* Abas: o mesmo desenho do seletor de período, um pouco maior. */
-.tabs {
-  display: inline-flex;
-  gap: 2px;
-  margin-bottom: 14px;
-  padding: 3px;
-  border: var(--bw) solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.tabs button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 9px;
-  color: var(--muted);
-  font-size: 0.9375rem;
-  font-weight: var(--fw-bold);
-  background: transparent;
-}
-
-.tabs button:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-
-.tabs button.active {
-  color: #ffffff;
-  font-weight: var(--fw-heavy);
-  background: var(--night);
-}
-
-.tab-count {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: var(--fw-heavy);
-  background: var(--line-soft);
-  color: var(--ink);
-}
-
-.tabs button.active .tab-count {
-  color: var(--night);
-  background: #ffffff;
-}
-
 .rules {
   display: flex;
   flex-direction: column;
