@@ -32,14 +32,24 @@ const { recentSeries } = useRecentSeries()
 
 const devices = computed(() => props.tank.spec.members.map((m) => m.device))
 
+function rank(role: string): number {
+  const i = WATER_ORDER.indexOf(role)
+  return i === -1 ? WATER_ORDER.length : i
+}
+
 function format(n: number | null, decimals: number): string {
   return n === null ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
 /** Cada variável dos sensores do tanque: o que a água está dizendo agora. */
+/** A ordem da água: o que mais pesa para o peixe primeiro. */
+const WATER_ORDER = ['temperature', 'ph', 'oxygen', 'turbidity', 'level', 'light']
+
 const water = computed(() =>
-  devices.value
-    .filter((d) => d.kind === 'sensor')
+  props.tank.spec.members
+    .filter((m) => m.device.kind === 'sensor')
+    .sort((a, b) => rank(a.role) - rank(b.role))
+    .map((m) => m.device)
     .flatMap((device) =>
       device.fields.map((field) => {
         const current = value(device.id, field.key)
