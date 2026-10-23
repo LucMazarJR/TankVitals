@@ -668,3 +668,89 @@ Um usuário por serviço, sem `guest`. As senhas saem do `scripts/gerar_segredos
 O usuário `api` tem também a tag `monitoring`, para consultar a API de
 gerenciamento do RabbitMQ (`/api/queues`, `/api/overview`, `/api/consumers`) e
 montar a página Mensageria.
+
+---
+
+## 15. Cadastro inicial: ids, campos e faixas
+
+É o seed do PostgreSQL (BACK-02) e o que o simulador publica (IOT-01). Os ids
+estão no código do frontend (`SEED_DEVICES`, em
+`frontend/src/mock/registry.ts`): **o seed do backend tem que bater com esta
+tabela**, senão o dashboard e o 3D não reconhecem o dispositivo.
+
+| Id | Nome | Tipo | Campo | Unidade | Casas | Faixa |
+| --- | --- | --- | --- | --- | --- | --- |
+| `temp-agua-01` | Termômetro da água | sensor | `temperature_c` | °C | 1 | normal de 24 a 28; crítico abaixo de 22 ou acima de 30 |
+| `ph-01` | Sonda de pH | sensor | `ph` | pH | 2 | normal de 6,5 a 8; crítico abaixo de 6 ou acima de 8,5 |
+| `nivel-01` | Sensor de nível | sensor | `level_pct` | % | 1 | normal a partir de 30; crítico abaixo de 15 |
+| `turbidez-01` | Turbidímetro | sensor | `turbidity_ntu` | NTU | 1 | normal até 40; crítico acima de 60 |
+| `od-01` | Sonda de oxigênio | sensor | `oxygen_mg_l` | mg/L | 2 | normal a partir de 5; crítico abaixo de 3 |
+| `luz-01` | Sensor de luz | sensor | `light_lux` | lux | 0 | sem faixa: não gera alerta |
+| `bomba-rec-01` | Bomba de recirculação | equipment | `vibration_mm_s` | mm/s | 2 | normal até 2,8; crítico acima de 4,5 |
+| | | | `current_a` | A | 2 | normal até 3,2; crítico acima de 3,8 |
+| | | | `motor_temp_c` | °C | 1 | normal até 65; crítico acima de 80 |
+| | | | `flow_l_min` | L/min | 1 | normal a partir de 40; crítico abaixo de 30 |
+| `aerador-01` | Aerador | actuator | (só o estado `on`) | | | controle pela regra |
+| `bomba-repo-01` | Reposição de água | actuator | (só o estado `on`) | | | controle manual |
+
+Todos estão na zona `tanque-01`. Os campos têm também um nome completo
+(`label`, "Oxigênio dissolvido") e um curto (`short`, "Oxigênio"), que estão no
+seed do front.
+
+- **Estado e comandos:** a bomba de recirculação tem o estado `running` e
+  aceita `on`, `inject_fault` e `repair`, com controle manual. Os atuadores têm
+  o estado `on` e aceitam só `on`.
+- **Como a faixa classifica**, igual no backend e no front (`classify`, em
+  `frontend/src/alerts.ts`): abaixo de `crit_min` ou acima de `crit_max` é
+  crítico; fora de `ok_min`–`ok_max` é atenção; o resto é normal. **Os limites
+  contam como dentro**: 28 °C ainda é normal e 40 NTU também (no 1º bimestre,
+  40 NTU já era atenção, §5). Limite `null` quer dizer "sem limite daquele
+  lado".
+- **Regra do aerador** (`aerador-od`): vigia `od-01.oxygen_mg_l`, liga o
+  `aerador-01` abaixo de 5 mg/L e desliga a partir de 6,5.
+- **Cadastro novo pela tela:** id e zona só com letras minúsculas, números e
+  hífen. O id segue a convenção prefixo + número (`ph-02`), e uma zona nova,
+  como `tanque-02`, vira outro tanque no dashboard e no 3D.
+
+---
+
+## 16. Bancos: PostgreSQL e InfluxDB
+
+### 16.1 PostgreSQL
+
+O PostgreSQL guarda o que é cadastro e registro (BACK-02). As tabelas abaixo
+são **proposta para a BACK**: tipos e índices ficam com quem implementa, mas
+os nomes que viram JSON nas rotas (§17) têm que bater.
+
+| Tabela | Colunas principais |
+| --- | --- |
+| `users` | `id`, `username` (único), `password_hash` (bcrypt), `role` (`viewer`, `operator` ou `admin`), `failed_attempts`, `locked_until` |
+| `devices` | `id` (texto, chave), `name`, `kind`, `zone`, `active`, `state_field`, `commands` (lista), `control` (`manual`, `rule` ou nulo), `created_at`, `updated_at` |
+| `device_fields` | `device_id`, `key` (a dupla é a chave), `label`, `short`, `unit`, `decimals`, `ok_min`, `ok_max`, `crit_min`, `crit_max` |
+| `rules` | `id`, `name`, `device_id`, `field_key`, `actuator_id`, `on_below`, `off_at`, `updated_at`, `updated_by` |
+| `alerts` | `id`, `device_id`, `field_key` (nulo nos da IA), `level`, `message`, `value` (nulo nos da IA), `opened_at`, `closed_at` |
+| `commands` | `id`, `device_id`, `command`, `value`, `origin` (`web` ou `regra`), `username`, `created_at` |
+| `audit` | `id`, `ts`, `username`, `type`, `action`, `target`, `detail`, `ok` |
+| `jobs` | `id`, `kind` (`datagen` ou `train`), `params`, `status`, `progress`, `message`, `created_by`, `created_at`, `finished_at`, `result` |
+| `model_versions` | `id`, `model` (`rul` ou `health`), `version`, `metrics`, `baseline`, `active`, `created_at`, `job_id` |
+
+- **Desativar não apaga:** o dispositivo continua no banco com
+  `active = false`, para o histórico e a auditoria continuarem fazendo sentido.
+- **Tipos e ações da auditoria**, os mesmos que a tela mostra
+  (`frontend/src/domain/audit.ts`):
+  - `login`: `login`, `login_failed` e `login_blocked`;
+  - `command`: `command`;
+  - `registry`: `device_created`, `device_updated`, `device_deactivated` e `rule_updated`;
+  - `job`: `datagen_started` e `train_started`;
+  - `assistant`: `question`.
+
+### 16.2 InfluxDB
+
+| Bucket | Measurement | Tags | Fields |
+| --- | --- | --- | --- |
+| `tankvitals` | `telemetry` | `device`, `zone`, `kind` | as chaves do payload; estados (`on`, `running`) gravados como 0 e 1 |
+| `tankvitals` | `insight` | `device`, `model_version` | `health`, `rul_h` |
+| `lab` | `synthetic` | `pump`, `dataset` | uma amostra dos dados gerados (IA-02), separada do ao vivo |
+
+O estado vai como 0 e 1 para dar para somar: é assim que o histórico calcula o
+tempo ligado (`on_s`) e quantas vezes ligou (`turn_ons`).
