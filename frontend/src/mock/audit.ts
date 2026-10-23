@@ -9,8 +9,28 @@ import type { AuditEntry, AuditPage, AuditQuery } from '../domain/audit'
 
 type NewEntry = Omit<AuditEntry, 'id' | 'ts'>
 
-const log: AuditEntry[] = []
-let seq = 0
+const STORAGE_KEY = 'tankvitals.mock.audit'
+
+/** O log desta aba, se já houver: recarregar a página não apaga o que se fez. */
+function restore(): AuditEntry[] {
+  try {
+    const data = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? 'null')
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+const log: AuditEntry[] = restore()
+let seq = log.length
+
+function persist(): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(log))
+  } catch {
+    // Sem armazenamento, o log vale só até recarregar.
+  }
+}
 
 function push(entry: NewEntry, at: Date): void {
   seq += 1
@@ -20,6 +40,7 @@ function push(entry: NewEntry, at: Date): void {
 /** Grava agora. O mock chama no login, nos comandos e nas edições do cadastro. */
 export function recordAudit(entry: NewEntry): void {
   push(entry, new Date())
+  persist()
 }
 
 export function queryAudit(query: AuditQuery): AuditPage {
@@ -169,4 +190,5 @@ function seed(): void {
     .forEach(({ at, entry }) => push(entry, at))
 }
 
-seed()
+// Os dias inventados só entram numa aba nova; numa recarga o log já veio do armazenamento.
+if (!log.length) seed()
